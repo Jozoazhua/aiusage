@@ -71,6 +71,18 @@ describe('calculateCost: 基本计费', () => {
     expect(result.estimatedCostUsd).toBe(20.5);
     expect(result.costStatus).toBe('exact');
   });
+
+  it('Codex auto-review 按 gpt-5.4 估算', () => {
+    const result = calculateCost('openai', 'codex', 'codex-auto-review', {
+      inputTokens: 1_000_000,
+      cachedInputTokens: 1_000_000,
+      cacheWriteTokens: 0,
+      outputTokens: 1_000_000,
+    });
+    // gpt-5.4: 1*2.5 + 1*0.25 + 1*15 = $17.75
+    expect(result.estimatedCostUsd).toBe(17.75);
+    expect(result.costStatus).toBe('estimated');
+  });
 });
 
 // ─── calculateCost: cached input ───

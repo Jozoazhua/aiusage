@@ -116,4 +116,28 @@ describe('calculateBreakdownCost', () => {
     expect(cost).toBe(20.5);
     expect([...warnings]).toEqual([]);
   });
+
+  it('estimates Codex auto-review with gpt-5.4 pricing', async () => {
+    const { calculateBreakdownCost } = await import('../report.js');
+    const warnings = new Set<string>();
+
+    const cost = calculateBreakdownCost({
+      provider: 'openai',
+      product: 'codex',
+      channel: 'cli',
+      model: 'codex-auto-review',
+      project: '/tmp/project',
+      eventCount: 1,
+      inputTokens: 1_000_000,
+      cachedInputTokens: 1_000_000,
+      cacheWriteTokens: 0,
+      outputTokens: 1_000_000,
+      reasoningOutputTokens: 0,
+    }, warnings);
+
+    expect(cost).toBe(17.75);
+    expect([...warnings]).toEqual([
+      'codex-auto-review 未在公开价目表单列，当前按 GPT-5.4 公开单价估算。',
+    ]);
+  });
 });
