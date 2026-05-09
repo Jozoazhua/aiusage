@@ -52,7 +52,12 @@ jobs:
           if (process.env.CLOUDFLARE_WORKER_NAME) {
             config = config.replace(/"name":\s*"[^"]+"/, `"name": "${process.env.CLOUDFLARE_WORKER_NAME}"`);
           }
-          config = config.replace(/"database_id":\s*"[^"]+"/, `"database_id": "${process.env.CLOUDFLARE_D1_DATABASE_ID}"`);
+          const databaseId = JSON.stringify(process.env.CLOUDFLARE_D1_DATABASE_ID);
+          if (/"database_id":\s*"[^"]+"/.test(config)) {
+            config = config.replace(/"database_id":\s*"[^"]+"/, `"database_id": ${databaseId}`);
+          } else {
+            config = config.replace(/("database_name":\s*"[^"]+")/, `$1,\n      "database_id": ${databaseId}`);
+          }
           fs.writeFileSync(path, config);
           NODE
         env:
