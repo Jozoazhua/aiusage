@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "aiusage-715eeba5",
+  "name": "aiusage",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "aiusage-db",
-      "database_id": "e05a4d86-92e9-4a70-a2d5-55a74eba463f"
+      "database_id": "00000000-0000-0000-0000-000000000000"
     }
   ],
   "ratelimits": [
@@ -35,6 +35,6 @@
   "vars": {
     "MAX_DEVICES": "10",
     "PUBLIC_PROJECT_VISIBILITY": "masked",
-    "DEFAULT_TIMEZONE": "America/Toronto"
+    "DEFAULT_TIMEZONE": "Asia/Shanghai"
   }
 }
