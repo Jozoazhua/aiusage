@@ -16,6 +16,7 @@ type FilterKey = 'deviceId' | 'provider' | 'product' | 'channel' | 'model' | 'pr
 
 interface DashboardFilters {
   minDate: string | null;
+  maxDate: string | null;
   range: string;
   deviceId: string | null;
   provider: string | null;
@@ -49,7 +50,7 @@ export async function handleOverview(url: URL, env: Env): Promise<Response> {
     d.setDate(d.getDate() - 364);
     return d.toISOString().split('T')[0];
   })();
-  const heatmapWhere = buildWhere({ ...filters, minDate: heatmapMinDate, range: '365d' });
+  const heatmapWhere = buildWhere({ ...filters, minDate: heatmapMinDate, maxDate: null, range: '365d' });
 
   const [
     summary,
@@ -204,7 +205,7 @@ export async function handleOverview(url: URL, env: Env): Promise<Response> {
   const costBearingEvents = Number(summary?.cost_bearing_events ?? 0);
   const totalCostUsd = roundUsd(summary?.total_cost_usd ?? 0);
 
-  return jsonOk({
+  const base = jsonOk({
     totalDays: activeDays,
     activeDays,
     totalEvents,
@@ -274,15 +275,34 @@ export async function handleOverview(url: URL, env: Env): Promise<Response> {
       },
     },
   }, true);
+
+  return new Response(base.body, {
+    status: base.status,
+    headers: { ...Object.fromEntries(base.headers), 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' },
+  });
 }
 
 function parseFilters(url: URL): DashboardFilters | null {
   const range = readTextParam(url, 'range') ?? '30d';
-  const minDate = buildMinDate(range);
-  if (minDate === undefined) return null;
+  const dateFrom = readTextParam(url, 'dateFrom');
+  const dateTo = readTextParam(url, 'dateTo');
+
+  let minDate: string | null;
+  let maxDate: string | null = null;
+
+  if (dateFrom || dateTo) {
+    minDate = dateFrom;
+    maxDate = dateTo;
+  } else {
+    const computed = buildMinDate(range);
+    if (computed === undefined) return null;
+    minDate = computed;
+    if (range === 'today') maxDate = minDate;
+  }
 
   return {
     minDate,
+    maxDate,
     range,
     deviceId: readTextParam(url, 'deviceId'),
     provider: readTextParam(url, 'provider'),
@@ -307,6 +327,10 @@ function buildWhere(filters: DashboardFilters, omit?: FilterKey): WhereParts {
   if (filters.minDate) {
     clauses.push('b.usage_date >= ?');
     params.push(filters.minDate);
+  }
+  if (filters.maxDate) {
+    clauses.push('b.usage_date <= ?');
+    params.push(filters.maxDate);
   }
   if (filters.deviceId && omit !== 'deviceId') {
     clauses.push('b.device_id = ?');
@@ -380,14 +404,13 @@ async function loadFacetOptions(column: string, filters: DashboardFilters, env: 
 async function loadDeviceLabels(deviceIds: string[], env: Env): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (!deviceIds.length) return map;
-  await Promise.all(deviceIds.map(async id => {
-    const row = await env.DB.prepare(
-      'SELECT public_label, hostname FROM devices WHERE device_id = ?'
-    ).bind(id).first<{ public_label: string | null; hostname: string | null }>();
-    if (row) {
-      map.set(id, row.public_label || row.hostname || id);
-    }
-  }));
+  const placeholders = deviceIds.map(() => '?').join(',');
+  const rows = await env.DB.prepare(
+    `SELECT device_id, public_label, hostname FROM devices WHERE device_id IN (${placeholders})`
+  ).bind(...deviceIds).all<{ device_id: string; public_label: string | null; hostname: string | null }>();
+  for (const row of rows.results ?? []) {
+    map.set(row.device_id, row.public_label || row.hostname || row.device_id);
+  }
   return map;
 }
 
@@ -420,9 +443,9 @@ async function buildSankey(rows: Array<{
   }
 
   const projectLabels = new Map<string, string>();
-  for (const [name] of projectTotals) {
+  await Promise.all([...projectTotals.keys()].map(async name => {
     projectLabels.set(name, await toPublicProjectName(name, env));
-  }
+  }));
 
   const nodes = [
     ...sortedNodeEntries(modelTotals).map(([label, totalTokens]) => ({
@@ -470,8 +493,19 @@ function buildMinDate(range: string): string | null | undefined {
   if (range === 'all') return null;
 
   const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+
+  if (range === 'today') return todayStr;
+
+  if (range === 'month') {
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    return `${y}-${String(m).padStart(2, '0')}-01`;
+  }
+
   let days: number;
   if (range === '7d') days = 7;
+  else if (range === '14d') days = 14;
   else if (range === '30d') days = 30;
   else if (range === '3m' || range === '90d') days = 90;
   else return undefined;

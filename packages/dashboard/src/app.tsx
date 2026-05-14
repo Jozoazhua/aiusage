@@ -23,19 +23,16 @@ import { DonutSection } from './components/donut-section';
 import { ActivityHeatmap } from './components/activity-heatmap';
 import { buildActivityHeatmapData } from './utils/activity-heatmap-data';
 import { HeaderLogo, FooterLogo, useFaviconFromLogo } from './components/site-logo';
+import { DateRangePicker } from './components/date-range-picker';
 import { SITE_TITLE } from './site-config';
 
 // ────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────
 
-function getRanges(t: T) {
-  return [
-    { value: 'all', label: t.all },
-    { value: '7d', label: t.range7d },
-    { value: '30d', label: t.range30d },
-    { value: '90d', label: t.range90d },
-  ] as const;
+function todayLocalDate(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 // ────────────────────────────────────────
@@ -251,7 +248,7 @@ function FilterChips({
 
 export function App() {
   const [filters, setFilters] = useState<FiltersState>({
-    range: '30d', deviceId: '', product: '',
+    range: '30d', deviceId: '', product: '', dateFrom: '', dateTo: '',
   });
 
   const {
@@ -353,21 +350,14 @@ export function App() {
         {/* ── Range + Filters (desktop) ── */}
         <div className="mt-2 mb-6 hidden sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
           <div className="flex items-center gap-2">
-            <SegmentedControl
-              value={filters.range === 'month' ? '' : filters.range}
-              options={getRanges(t)}
-              onChange={(v) => setFilters((f) => ({ ...f, range: v }))}
+            <DateRangePicker
+              range={filters.range}
+              dateFrom={filters.dateFrom ?? ''}
+              dateTo={filters.dateTo ?? ''}
+              onChange={({ range, dateFrom, dateTo }) => setFilters((f) => ({ ...f, range, dateFrom, dateTo }))}
+              locale={locale}
+              t={t}
             />
-            <button
-              onClick={() => setFilters((f) => ({ ...f, range: 'month' }))}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 ${
-                filters.range === 'month'
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-                  : 'bg-slate-100/80 text-slate-400 hover:text-slate-600 dark:bg-[#1a1a1a]/80 dark:text-slate-500 dark:hover:text-slate-300'
-              }`}
-            >
-              {t.thisMonth}
-            </button>
           </div>
           {overview && fOpts.products.length > 1 && (
             <>
@@ -396,12 +386,13 @@ export function App() {
 
         {/* ── Filters (mobile) ── */}
         <div className="mt-1 mb-5 flex flex-col gap-3 sm:hidden">
-          <FilterChips
-            label=""
-            value={filters.range}
-            options={[...getRanges(t), { value: 'month', label: t.thisMonth }].map((r) => ({ value: r.value, label: r.label, eventCount: 0, estimatedCostUsd: 0 }))}
-            allLabel=""
-            onChange={(v) => setFilters((f) => ({ ...f, range: v || '30d' }))}
+          <DateRangePicker
+            range={filters.range}
+            dateFrom={filters.dateFrom ?? ''}
+            dateTo={filters.dateTo ?? ''}
+            onChange={({ range, dateFrom, dateTo }) => setFilters((f) => ({ ...f, range, dateFrom, dateTo }))}
+            locale={locale}
+            t={t}
           />
           {overview && fOpts.products.length > 1 && (
             <FilterChips

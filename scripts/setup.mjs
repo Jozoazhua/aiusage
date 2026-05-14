@@ -16,7 +16,7 @@
  * 10. Deploy Worker + Dashboard
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -72,6 +72,33 @@ function runWithInput(cmd, input, opts = {}) {
     cwd: WORKER_DIR,
     ...opts,
   }).trim();
+}
+
+// 安全地执行带用户输入参数的 wrangler 命令，避免 shell 注入
+function wrangler(args, opts = {}) {
+  return execFileSync('npx', ['wrangler', ...args], {
+    encoding: 'utf-8',
+    stdio: 'pipe',
+    cwd: WORKER_DIR,
+    ...opts,
+  }).trim();
+}
+
+function wranglerWithInput(args, input, opts = {}) {
+  return execFileSync('npx', ['wrangler', ...args], {
+    encoding: 'utf-8',
+    input,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: WORKER_DIR,
+    ...opts,
+  }).trim();
+}
+
+function validateName(value, label) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value)) {
+    fail(`${label} 只允许字母、数字、连字符和下划线，且不能以连字符/下划线开头`);
+    process.exit(1);
+  }
 }
 
 function hex(bytes = 16) {
@@ -136,7 +163,9 @@ async function main() {
   // ── Step 3: Configuration ──
   step(3, 'Configuration');
   const workerName = await ask('Worker name', 'aiusage');
+  validateName(workerName, 'Worker name');
   const dbName = await ask('D1 database name', 'aiusage-db');
+  validateName(dbName, 'D1 database name');
   const maxDevices = await ask('Max devices', '10');
   const visibility = await ask('Project visibility (masked / hidden / plain)', 'masked');
   const timezone = await ask('Default timezone', 'Asia/Shanghai');
@@ -158,7 +187,7 @@ async function main() {
   let databaseId;
 
   try {
-    const output = run(`npx wrangler d1 create ${dbName} 2>&1`);
+    const output = wrangler(['d1', 'create', dbName]);
     // Try several patterns to extract the database ID
     const patterns = [
       /"uuid"\s*:\s*"([a-f0-9-]{36})"/i,
@@ -180,7 +209,7 @@ async function main() {
     if (msg.includes('already exists')) {
       warn(`Database "${dbName}" already exists, looking up ID...`);
       try {
-        const list = run('npx wrangler d1 list --json 2>&1');
+        const list = wrangler(['d1', 'list', '--json']);
         const dbs = JSON.parse(list);
         const found = dbs.find((d) => d.name === dbName);
         if (found) {
@@ -243,7 +272,7 @@ async function main() {
   ];
   for (const [key, value] of secrets) {
     try {
-      runWithInput(`npx wrangler secret put ${key}`, value);
+      wranglerWithInput(['secret', 'put', key], value);
       ok(key);
     } catch (e) {
       fail(`${key}: ${(e.stderr || e.message || '').toString().split('\n')[0]}`);
@@ -254,7 +283,7 @@ async function main() {
   // ── Step 8: D1 migration ──
   step(8, 'Run D1 migration');
   try {
-    const output = run(`npx wrangler d1 migrations apply ${dbName} --remote 2>&1`);
+    const output = wrangler(['d1', 'migrations', 'apply', dbName, '--remote']);
     if (output.includes('Nothing to migrate')) {
       ok('Already up to date');
     } else {

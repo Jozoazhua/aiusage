@@ -11,6 +11,8 @@ export interface FiltersState {
   range: string;
   deviceId: string;
   product: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface HealthPayload { ok: boolean; siteId: string; version: string; siteTitle?: string }

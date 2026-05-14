@@ -12,7 +12,21 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
   const tokenPayload = await verifyDeviceToken(auth, env.DEVICE_TOKEN_SECRET);
   if (!tokenPayload) return jsonError(401, 'INVALID_TOKEN', 'Invalid device token');
 
-  const body = await request.json<IngestPayload>();
+  let body: IngestPayload;
+  try {
+    body = await request.json<IngestPayload>();
+  } catch {
+    return jsonError(400, 'INVALID_PAYLOAD', 'Invalid JSON body');
+  }
+  if (
+    !body || typeof body !== 'object' ||
+    typeof body.siteId !== 'string' ||
+    !body.device || typeof body.device !== 'object' ||
+    typeof body.device.deviceId !== 'string' ||
+    !Array.isArray(body.days)
+  ) {
+    return jsonError(400, 'INVALID_PAYLOAD', 'Missing or invalid required fields');
+  }
 
   // 校验一致性
   if (body.siteId !== tokenPayload.siteId) {

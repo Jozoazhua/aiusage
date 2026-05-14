@@ -18,14 +18,18 @@ export async function handleEnroll(request: Request, env: Env): Promise<Response
     return jsonError(401, 'INVALID_TOKEN', 'Invalid enroll token');
   }
 
-  const body = await request.json<EnrollBody>();
+  let body: EnrollBody;
+  try {
+    body = await request.json<EnrollBody>();
+  } catch {
+    return jsonError(400, 'INVALID_PAYLOAD', 'Invalid JSON body');
+  }
+  if (!body || typeof body !== 'object' || !body.siteId || !body.deviceId || !body.hostname || !body.timezone) {
+    return jsonError(400, 'INVALID_PAYLOAD', 'Missing required fields: siteId, deviceId, hostname, timezone');
+  }
 
   if (body.siteId !== env.SITE_ID) {
     return jsonError(403, 'SITE_ID_MISMATCH', 'Site ID does not match');
-  }
-
-  if (!body.deviceId || !body.hostname || !body.timezone) {
-    return jsonError(400, 'INVALID_PAYLOAD', 'Missing required fields: deviceId, hostname, timezone');
   }
 
   // 检查设备是否已存在

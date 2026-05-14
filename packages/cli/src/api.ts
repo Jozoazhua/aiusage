@@ -110,8 +110,22 @@ export function defaultLookbackDays(config: AIUsageConfig): number {
   return config.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
 }
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('请求超时（30 秒），请检查网络连接');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await response.text();
 
   let data: T | ApiErrorResponse | null = null;
