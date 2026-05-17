@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useIsDark } from '../hooks/use-dark';
 import type { ActivityHeatmapDay } from '../utils/activity-heatmap-data';
+import { I18N, type Locale } from '../i18n';
 
 // ── 常量 ──
 
@@ -69,11 +70,13 @@ function useContainerWidth(ref: React.RefObject<HTMLDivElement | null>): number 
 
 // ── 主组件 ──
 
-export function ActivityHeatmap({ days, metricLabel = 'tokens', className = '' }: {
+export function ActivityHeatmap({ days, metricLabel = 'tokens', className = '', locale = 'en' }: {
   days: ActivityHeatmapDay[];
   metricLabel?: 'tokens' | 'sessions';
   className?: string;
+  locale?: Locale;
 }) {
+  const t = I18N[locale];
   const isDark = useIsDark();
   const containerRef = useRef<HTMLDivElement>(null);
   const containerWidth = useContainerWidth(containerRef);
@@ -146,13 +149,13 @@ export function ActivityHeatmap({ days, metricLabel = 'tokens', className = '' }
       {/* 统计摘要 */}
       <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
         <span>
-          <span className="font-semibold text-slate-700 dark:text-slate-200">{activeDays}</span> active days
+          <span className="font-semibold text-slate-700 dark:text-slate-200">{activeDays}</span> {t.activeDays.toLowerCase()}
         </span>
         <span>
-          <span className="font-semibold text-slate-700 dark:text-slate-200">{streak}</span> day streak
+          <span className="font-semibold text-slate-700 dark:text-slate-200">{streak}</span> {t.dayStreak}
         </span>
         <span>
-          <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtCompact(totalActivity)}</span> {metricLabel} total
+          <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtCompact(totalActivity)}</span> {metricLabel === 'tokens' ? t.totalTokens.toLowerCase() : t.sessions.toLowerCase()}
         </span>
       </div>
 
@@ -257,15 +260,14 @@ export function ActivityHeatmap({ days, metricLabel = 'tokens', className = '' }
                 )}
               </>
             ) : (
-              <div className="text-slate-400 dark:text-slate-500">No activity</div>
+              <div className="text-slate-400 dark:text-slate-500">{t.noActivity}</div>
             )}
           </div>
         )}
       </div>
 
-      {/* 空状态 */}
       {days.length === 0 && (
-        <p className="text-xs text-slate-400 dark:text-slate-500">No activity data in the past year.</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">{t.noActivityData}</p>
       )}
     </div>
   );

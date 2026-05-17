@@ -11,9 +11,9 @@ import { formatCompact, formatNumber, shortDate, longDate } from '../utils/forma
 import { EmptyState } from './chart-helpers';
 import { useIsDark } from '../hooks/use-dark';
 
-export function TokenCompositionChart({ data, locale }: { data: OverviewPayload['tokenComposition']; locale: Locale }) {
+export function TokenCompositionChart({ data, locale, noDataLabel = 'No data' }: { data: OverviewPayload['tokenComposition']; locale: Locale; noDataLabel?: string }) {
   const isDark = useIsDark();
-  if (!data.length) return <EmptyState label="No data" />;
+  if (!data.length) return <EmptyState label={noDataLabel} />;
   const barW = data.length <= 7 ? 94 : data.length <= 30 ? 47 : 20;
   return (
     <ChartContainer config={getTokenConfig(isDark)} className="h-[280px] w-full">

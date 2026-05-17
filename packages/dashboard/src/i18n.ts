@@ -51,6 +51,8 @@ export const I18N = {
     commonParams: 'Common Parameters', paramName: 'Parameter', paramValues: 'Values', paramDefault: 'Default', paramDesc: 'Description',
     required: 'Required', theme: 'Theme', timeRange: 'Time Range', transparent: 'Transparent', language: 'Language',
     filterDevice: 'Filter by Device', filterProduct: 'Filter by Product', items: 'Items',
+    activityHeatmap: 'Activity Heatmap',
+    dayStreak: 'day streak', noActivity: 'No activity', noActivityData: 'No activity data in the past year.',
   },
   zh: {
     estimatedCost: '预估费用', totalTokens: '总 Token',
@@ -97,6 +99,8 @@ export const I18N = {
     commonParams: '通用参数', paramName: '参数', paramValues: '可选值', paramDefault: '默认值', paramDesc: '说明',
     required: '必填', theme: '主题', timeRange: '时间范围', transparent: '透明背景', language: '语言',
     filterDevice: '按设备筛选', filterProduct: '按产品筛选', items: '子项',
+    activityHeatmap: '年度活跃热力图',
+    dayStreak: '连续天', noActivity: '无活动', noActivityData: '过去一年暂无活动数据。',
   },
 } as const;
 

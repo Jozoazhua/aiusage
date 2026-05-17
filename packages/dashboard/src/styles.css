@@ -8,10 +8,24 @@
 
 :root {
   color-scheme: light;
+  --ai-bg: #f7f3ea;
+  --ai-surface: #fffaf0;
+  --ai-surface-muted: #f1eadc;
+  --ai-border: rgba(83, 64, 43, 0.12);
+  --ai-text: #2f261d;
+  --ai-muted: #7a6f62;
+  --ai-accent: #c96442;
 }
 
 .dark {
   color-scheme: dark;
+  --ai-bg: #171512;
+  --ai-surface: #211e19;
+  --ai-surface-muted: #2a261f;
+  --ai-border: rgba(255, 244, 225, 0.10);
+  --ai-text: #eee5d6;
+  --ai-muted: #b8aa98;
+  --ai-accent: #d97757;
 }
 
 html, body, #root {
@@ -29,18 +43,13 @@ html.theme-transition *::after {
 
 body {
   margin: 0;
-  background: #fafafa;
-  color: #0f172a;
+  background: var(--ai-bg);
+  color: var(--ai-text);
   font-family: var(--font-sans);
   font-feature-settings: "ss01" on, "cv11" on;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-}
-
-.dark body {
-  background: #0a0a0a;
-  color: #a1a1a1;
 }
 
 * {
@@ -49,24 +58,19 @@ body {
 }
 
 ::selection {
-  background: rgba(15, 23, 42, 0.06);
+  background: rgba(83, 64, 43, 0.10);
 }
 
 .dark ::selection {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 244, 225, 0.15);
 }
 
 /* Card */
 .card {
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.7);
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
   border-radius: 12px;
   overflow: clip;
-}
-
-.dark .card {
-  background: #111111;
-  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Charts need visible overflow for tooltips, min-w-0 prevents grid blowout */
@@ -92,6 +96,23 @@ body {
   animation: fade-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
+/* Skeleton shimmer */
+@keyframes ai-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--ai-surface-muted) 25%,
+    var(--ai-surface)       50%,
+    var(--ai-surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: ai-shimmer 1.6s ease-in-out infinite;
+}
+
 /* Hide scrollbar for horizontal filter tabs on mobile */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -113,20 +134,20 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: rgba(83, 64, 43, 0.20);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: rgba(83, 64, 43, 0.35);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: rgba(255, 244, 225, 0.12);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: rgba(255, 244, 225, 0.20);
 }
 
 /* Embed mode */
@@ -141,27 +162,31 @@ body.embed-transparent .card {
 }
 
 body.embed-transparent .card {
-  border-color: rgba(148, 163, 184, 0.15);
+  border-color: rgba(83, 64, 43, 0.10);
 }
 
 .dark body.embed-transparent .card {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 244, 225, 0.06);
 }
 
-/* ── Card hover lift (PC only) ── */
+/* Card hover — border/shadow only, no scale */
 @media (hover: hover) and (min-width: 640px) {
   .card {
-    transition: transform 0.2s ease-out;
+    transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
   }
   .card:hover {
-    transform: scale(1.012);
+    border-color: rgba(83, 64, 43, 0.24);
+    box-shadow: 0 2px 10px rgba(83, 64, 43, 0.07);
+  }
+  .dark .card:hover {
+    border-color: rgba(255, 244, 225, 0.18);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.40);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none !important;
-    transform: none !important;
   }
 }
 
@@ -180,7 +205,62 @@ body.embed-transparent .card {
 /* Dark-mode Recharts tooltip override */
 .dark .recharts-tooltip-wrapper .recharts-default-tooltip,
 .dark [class*="ChartTooltipContent"] {
-  background: #1a1a1a !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  color: #a1a1a1 !important;
+  background: var(--ai-surface) !important;
+  border-color: var(--ai-border) !important;
+  color: var(--ai-muted) !important;
+}
+
+/* react-day-picker warm palette overrides */
+.ai-rdp-panel .rdp-root {
+  --rdp-accent-color: var(--ai-text);
+  --rdp-accent-background-color: var(--ai-surface-muted);
+  --rdp-today-color: var(--ai-accent);
+  --rdp-range_start-color: var(--ai-bg);
+  --rdp-range_end-color: var(--ai-bg);
+  --rdp-range_middle-color: var(--ai-text);
+  --rdp-range_start-date-background-color: var(--ai-text);
+  --rdp-range_end-date-background-color: var(--ai-text);
+  --rdp-range_middle-background-color: var(--ai-surface-muted);
+  --rdp-day-height: 38px;
+  --rdp-day-width: 38px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+}
+
+.ai-rdp-panel .rdp-chevron {
+  fill: var(--ai-muted);
+}
+
+.ai-rdp-panel .rdp-button_previous:hover .rdp-chevron,
+.ai-rdp-panel .rdp-button_next:hover .rdp-chevron {
+  fill: var(--ai-text);
+}
+
+.ai-rdp-panel .rdp-month_caption {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ai-text);
+}
+
+.ai-rdp-panel .rdp-weekday {
+  color: var(--ai-muted);
+  font-size: 11px;
+}
+
+.ai-rdp-panel .rdp-day {
+  color: var(--ai-text);
+  font-size: 12px;
+}
+
+.ai-rdp-panel .rdp-day_button {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ai-rdp-panel .rdp-selected .rdp-day_button {
+  border-color: transparent;
+}
+
+.ai-rdp-panel .rdp-outside {
+  color: var(--ai-muted);
 }

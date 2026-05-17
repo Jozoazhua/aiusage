@@ -17,8 +17,24 @@
 </p>
 
 <p align="center">
-  <a href="https://aiusage.yizhe.me"><strong>Live Demo</strong></a>
+  <a href="https://aiusage.simplenaive.icu/"><strong>Live Demo</strong></a>
 </p>
+
+---
+
+## Changes in This Fork
+
+- **Warm paper UI** — replaced cold slate palette with warm CSS custom properties (`--ai-*`), light/dark both
+- **Date filter redesign** — inline pills (All / Today / 7D / 30D / Custom) with calendar popup; future dates disabled
+- **Pricing data as JSON** — extracted all model pricing from `pricing.ts` into `pricing.json` for easier maintenance; fixed o1-mini price
+- **SPA routing fix** — `/pricing` and `/embed/docs` no longer throw `INTERNAL_ERROR`; removed them from `run_worker_first`
+- **Embed range options** — aligned with dashboard filter pills (all / today / 7d / 30d)
+- **Mobile improvements** — touch-scroll for filter chips; pricing page switches to card layout on small screens
+- **Skeleton shimmer** — warm gradient shimmer replaces plain pulse animation
+- **DataGuard component** — centralises unavailable / empty-state / error-boundary logic across all charts
+- **Activity heatmap i18n** — "active days", "streak", "no activity" fully translated
+- **Simplified footer** — all pages show only: Model Pricing · Embed · GitHub
+- **Header home link** — clicking the site logo returns to the dashboard from any sub-page
 
 ---
 
@@ -70,7 +86,7 @@ graph LR
 Copy this prompt, paste it into your AI coding agent (Claude Code, Codex, Copilot, Gemini, etc.):
 
 ```text
-Clone https://github.com/ennann/aiusage.git, read skills/aiusage-server/aiusage-server.md,
+Clone https://github.com/Jozoazhua/aiusage.git, read skills/aiusage-server/aiusage-server.md,
 and help me deploy AIUsage to my Cloudflare account.
 After the server is up, follow skills/aiusage-cli/aiusage-cli.md to connect this device.
 ```
@@ -78,7 +94,7 @@ After the server is up, follow skills/aiusage-cli/aiusage-cli.md to connect this
 ### Or deploy manually
 
 ```bash
-git clone https://github.com/ennann/aiusage.git
+git clone https://github.com/Jozoazhua/aiusage.git
 cd aiusage && pnpm install
 npx wrangler login
 pnpm setup
@@ -93,11 +109,11 @@ aiusage report --range 7d
 
 ## Staying Up to Date
 
-AIUsage uses a **fork-based update model** — fork this repo, connect your fork to Cloudflare Workers via Git integration, and updates flow automatically.
+AIUsage uses a **fork-based update model** — fork [Jozoazhua/aiusage](https://github.com/Jozoazhua/aiusage), connect your fork to Cloudflare Workers via Git integration, and updates flow automatically.
 
-1. **Fork** this repository to your GitHub account
+1. **Fork** [Jozoazhua/aiusage](https://github.com/Jozoazhua/aiusage) to your GitHub account
 2. **Connect** your fork to Cloudflare Workers (Git integration)
-3. **Sync** upstream updates via GitHub's "Sync fork" button or `git merge upstream/main`
+3. **Sync** updates via GitHub's "Sync fork" button or `git merge upstream/main`
 4. Cloudflare **auto-redeploys** on every push to your fork
 
 CLI updates are separate: `npm update -g @aiusage/cli`

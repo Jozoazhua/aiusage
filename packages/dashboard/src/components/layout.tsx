@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { RotateCw, Github, Heart, Sun, Moon, Monitor } from 'lucide-react';
+import { RotateCw, Github, Sun, Moon, Monitor } from 'lucide-react';
 import type { Locale, T } from '../i18n';
 import { I18N, getStoredLocale } from '../i18n';
 import type { ThemeMode } from '../theme';
 import { getStoredTheme, applyTheme } from '../theme';
 import type { HealthPayload } from '../hooks/use-overview';
-import { HeaderLogo, FooterLogo, useFaviconFromLogo } from './site-logo';
+import { HeaderLogo, useFaviconFromLogo } from './site-logo';
 import { SITE_TITLE } from '../site-config';
 
 // ────────────────────────────────────────
@@ -167,10 +167,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* ── Header ── */}
         <header className="fade-up relative z-20 py-6 sm:py-8">
           <div className="flex flex-wrap items-center justify-between gap-y-2">
-            <h1 className="flex items-center gap-2 text-[18px] sm:text-[22px] font-semibold tracking-tight text-slate-900 dark:text-slate-300">
+            <a
+              href="/"
+              className="flex items-center gap-2 text-[18px] sm:text-[22px] font-semibold tracking-tight text-slate-900 hover:opacity-75 transition-opacity dark:text-slate-300"
+            >
               <HeaderLogo />
               {SITE_TITLE}
-            </h1>
+            </a>
             <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
               <ThemeToggle value={theme} onChange={setTheme} locale={locale} />
               <LangToggle value={locale} onChange={setLocale} />
@@ -188,59 +191,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
 
         {/* ── Footer ── */}
-        <footer className="fade-up mt-16 border-t border-slate-100 dark:border-white/[0.08] pb-10 pt-8">
+        <footer className="fade-up mt-16 border-t border-[var(--ai-border)] pb-10 pt-8">
           <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-3 text-[12px] text-slate-400 dark:text-slate-500">
-              <span className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-                <FooterLogo />
-                {SITE_TITLE}
+            {health?.version && (
+              <span className="rounded-full bg-[var(--ai-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--ai-muted)]">
+                v{health.version}
               </span>
-              {health?.version && (
-                <span className="rounded-full bg-slate-100 dark:bg-[#1a1a1a] px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                  v{health.version}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-[11px] text-slate-300 dark:text-slate-600">
-              <div className="flex items-center gap-4">
-                <a
-                  href="/pricing"
-                  className="text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                >
-                  {t.pricing}
-                </a>
-                <span className="h-3 w-px bg-slate-200 dark:bg-[#222222]" />
-                <a
-                  href="/embed/docs"
-                  className="text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                >
-                  {t.embedWidgets}
-                </a>
-              </div>
-              <div className="flex items-center gap-4">
-                <a
-                  href="https://github.com/ennann/aiusage"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                >
-                  <Github className="h-3.5 w-3.5" />
-                  <span>GitHub</span>
-                </a>
-                <span className="h-3 w-px bg-slate-200 dark:bg-[#222222]" />
-                <span className="flex items-center gap-1">
-                  Made with <Heart className="h-3 w-3 fill-red-300 text-red-300" /> by{' '}
-                  <a
-                    href="https://x.com/qingnianxiaozhe"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                  >
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-                    qingnianxiaozhe
-                  </a>
-                </span>
-              </div>
+            )}
+            <div className="flex items-center gap-4 text-[11px]">
+              <a
+                href="/pricing"
+                className="text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+              >
+                {t.pricing}
+              </a>
+              <span className="h-3 w-px bg-[var(--ai-border)]" />
+              <a
+                href="/embed/docs"
+                className="text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+              >
+                {t.embedWidgets}
+              </a>
+              <span className="h-3 w-px bg-[var(--ai-border)]" />
+              <a
+                href="https://github.com/Jozoazhua/aiusage"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+              >
+                <Github className="h-3.5 w-3.5" />
+                <span>GitHub</span>
+              </a>
             </div>
           </div>
         </footer>

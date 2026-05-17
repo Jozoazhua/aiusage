@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { RotateCw, Github, Heart, Sun, Moon, Monitor } from 'lucide-react';
+import { RotateCw, Github, Sun, Moon, Monitor } from 'lucide-react';
 import type { Locale, T } from './i18n';
 import { I18N, getStoredLocale } from './i18n';
 import type { ThemeMode } from './theme';
@@ -12,7 +12,8 @@ import {
 } from './utils/format';
 import type { FiltersState, FacetOption } from './hooks/use-overview';
 import { useOverview } from './hooks/use-overview';
-import { ChartBoundary, EmptyState, Skeleton, SectionHeader, ChartLegend } from './components/chart-helpers';
+import { ChartBoundary, EmptyState, Skeleton, SectionHeader, ChartLegend, DataGuard } from './components/chart-helpers';
+// ChartBoundary + EmptyState still used in Share section
 import { KpiCard, CostKpiCard } from './components/kpi-card';
 import { useFetchCnyRate, useCurrencyStore } from './hooks/use-cny-rate';
 import { CostTrendChart } from './components/cost-trend-chart';
@@ -22,7 +23,7 @@ import { FlowChart } from './components/flow-chart';
 import { DonutSection } from './components/donut-section';
 import { ActivityHeatmap } from './components/activity-heatmap';
 import { buildActivityHeatmapData } from './utils/activity-heatmap-data';
-import { HeaderLogo, FooterLogo, useFaviconFromLogo } from './components/site-logo';
+import { HeaderLogo, useFaviconFromLogo } from './components/site-logo';
 import { DateRangePicker } from './components/date-range-picker';
 import { SITE_TITLE } from './site-config';
 
@@ -53,7 +54,7 @@ const THEME_LABELS: Record<ThemeMode, { en: string; zh: string }> = {
 
 function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: (v: ThemeMode) => void; locale: Locale }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="inline-flex items-center rounded-md bg-[var(--ai-surface-muted)] p-0.5">
       {THEME_OPTIONS.map((o) => {
         const Icon = o.icon;
         return (
@@ -62,8 +63,8 @@ function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: 
             onClick={() => onChange(o.value)}
             className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
               value === o.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-                : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
+                ? 'bg-[var(--ai-surface)] text-[var(--ai-text)] shadow-sm'
+                : 'text-[var(--ai-muted)] hover:text-[var(--ai-text)]'
             }`}
             aria-label={o.value}
           >
@@ -78,15 +79,15 @@ function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: 
 
 function LangToggle({ value, onChange }: { value: Locale; onChange: (v: Locale) => void }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="inline-flex items-center rounded-md bg-[var(--ai-surface-muted)] p-0.5">
       {(['en', 'zh'] as const).map((l) => (
         <button
           key={l}
           onClick={() => onChange(l)}
           className={`rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
             value === l
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
+              ? 'bg-[var(--ai-surface)] text-[var(--ai-text)] shadow-sm'
+              : 'text-[var(--ai-muted)] hover:text-[var(--ai-text)]'
           }`}
         >
           {l === 'en' ? 'EN' : '中'}
@@ -110,7 +111,7 @@ function SegmentedControl({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="inline-flex items-center rounded-lg bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80" role="radiogroup">
+    <div className="inline-flex items-center rounded-lg bg-[var(--ai-surface-muted)] p-0.5" role="radiogroup">
       {options.map((o) => (
         <button
           key={o.value}
@@ -119,8 +120,8 @@ function SegmentedControl({
           onClick={() => onChange(o.value)}
           className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-all duration-150 ${
             value === o.value
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
+              ? 'bg-[var(--ai-surface)] text-[var(--ai-text)] shadow-sm'
+              : 'text-[var(--ai-muted)] hover:text-[var(--ai-text)]'
           }`}
         >
           {o.label}
@@ -144,10 +145,10 @@ function FilterTabs({
   tooltips?: Record<string, string>;
 }) {
   if (!options.length) return null;
-  const activeClass = 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300';
-  const inactiveClass = 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300';
+  const activeClass = 'bg-[var(--ai-surface)] text-[var(--ai-text)] shadow-sm';
+  const inactiveClass = 'text-[var(--ai-muted)] hover:text-[var(--ai-text)]';
   return (
-    <div className="inline-flex items-center rounded-lg bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80 flex-nowrap">
+    <div className="inline-flex items-center rounded-lg bg-[var(--ai-surface-muted)] p-0.5 flex-nowrap">
       <button
         onClick={() => onChange('')}
         className={`shrink-0 rounded-md px-2.5 py-1.5 text-[12px] font-medium whitespace-nowrap transition-all duration-150 ${
@@ -196,13 +197,13 @@ function FilterChips({
   tooltips?: Record<string, string>;
 }) {
   if (!options.length) return null;
-  const active = 'bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900';
-  const inactive = 'bg-white text-slate-500 border border-slate-200 dark:bg-[#1a1a1a] dark:text-slate-400 dark:border-white/10';
+  const active = 'bg-[var(--ai-text)] text-[var(--ai-bg)]';
+  const inactive = 'bg-[var(--ai-surface)] text-[var(--ai-muted)] border border-[var(--ai-border)]';
   return (
     <div className="flex items-center gap-2 min-w-0">
-      {label && <span className="shrink-0 text-[12px] font-medium text-slate-400 dark:text-slate-500">{label}</span>}
+      {label && <span className="shrink-0 text-[12px] font-medium text-[var(--ai-muted)]">{label}</span>}
       <div className="relative min-w-0 flex-1">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="overflow-x-auto scrollbar-hide touch-pan-x overscroll-x-contain">
           <div className="flex gap-1.5 w-max pr-4">
             {allLabel && (
               <button
@@ -236,7 +237,7 @@ function FilterChips({
             })}
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#fafafa] dark:from-[#0a0a0a]" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#f7f3ea] dark:from-[#171512]" />
       </div>
     </div>
   );
@@ -328,7 +329,7 @@ export function App() {
       {/* ── Header ── */}
       <header className="fade-up relative z-20 py-6 sm:py-8">
         <div className="flex flex-wrap items-center justify-between gap-y-2">
-          <h1 className="flex items-center gap-2 text-[18px] sm:text-[22px] font-semibold tracking-tight text-slate-900 dark:text-slate-300">
+          <h1 className="flex items-center gap-2 text-[18px] sm:text-[22px] font-semibold tracking-tight text-[var(--ai-text)]">
             <HeaderLogo />
             {SITE_TITLE}
           </h1>
@@ -337,7 +338,7 @@ export function App() {
             <LangToggle value={locale} onChange={setLocale} />
             <button
               onClick={refresh}
-              className="hidden sm:inline-flex items-center justify-center rounded-md bg-slate-100/80 p-1.5 text-slate-400 transition-colors hover:text-slate-600 dark:bg-[#1a1a1a]/80 dark:text-slate-500 dark:hover:text-slate-300"
+              className="hidden sm:inline-flex items-center justify-center rounded-md bg-[var(--ai-surface-muted)] p-1.5 text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
               aria-label="Refresh"
             >
               <RotateCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -361,7 +362,7 @@ export function App() {
           </div>
           {overview && fOpts.products.length > 1 && (
             <>
-              <div className="h-5 w-px bg-slate-200 dark:bg-[#222222]" />
+              <div className="h-5 w-px bg-[var(--ai-border)]" />
               <FilterTabs
                 value={filters.product}
                 options={fOpts.products}
@@ -373,7 +374,7 @@ export function App() {
           )}
           {overview && fOpts.devices.length >= 1 && (
             <>
-              <div className="h-5 w-px bg-slate-200 dark:bg-[#222222]" />
+              <div className="h-5 w-px bg-[var(--ai-border)]" />
               <FilterTabs
                 value={filters.deviceId}
                 options={fOpts.devices}
@@ -439,7 +440,7 @@ export function App() {
         </div>
       ) : error ? (
         <div className="card flex min-h-[320px] flex-col items-center justify-center p-8">
-          <div className="mb-1.5 text-[13px] text-slate-400 dark:text-slate-500">{t.failedToLoad}</div>
+          <div className="mb-1.5 text-[13px] text-[var(--ai-muted)]">{t.failedToLoad}</div>
           <div className="text-[13px] text-red-500/80">{error}</div>
         </div>
       ) : (
@@ -508,66 +509,47 @@ export function App() {
 
           {/* ── Activity Heatmap ── */}
           <div className="card fade-up p-6" style={{ animationDelay: '120ms' }}>
-            <SectionHeader title={locale === 'zh' ? '年度活跃热力图' : 'Activity Heatmap'} />
-            <ActivityHeatmap days={activityHeatmap.days} metricLabel={activityHeatmap.metricLabel} />
+            <SectionHeader title={t.activityHeatmap} />
+            <ActivityHeatmap days={activityHeatmap.days} metricLabel={activityHeatmap.metricLabel} locale={locale} />
           </div>
 
           {/* ── Cost Trend ── */}
           <div className="card fade-up p-6" style={{ animationDelay: '150ms' }}>
             <SectionHeader title={t.costTrend} stat={unavailable ? t.unavailable : formatUsd(overview?.totalCostUsd ?? 0)} />
-            {unavailable ? (
-              <EmptyState label={t.costUnavailable} />
-            ) : (
-              <ChartBoundary name="Cost Trend">
-                <CostTrendChart
-                  data={overview?.dailyTrend ?? []}
-                  providerTrend={overview?.providerDailyTrend ?? []}
-                />
-              </ChartBoundary>
-            )}
+            <DataGuard unavailable={unavailable} label={t.costUnavailable} name="Cost Trend">
+              <CostTrendChart
+                data={overview?.dailyTrend ?? []}
+                providerTrend={overview?.providerDailyTrend ?? []}
+                noDataLabel={t.noData}
+              />
+            </DataGuard>
           </div>
 
           {/* ── Token Trend ── */}
           <div className="card fade-up p-6" style={{ animationDelay: '200ms' }}>
             <SectionHeader title={t.tokenTrend} stat={unavailable ? t.unavailable : formatCompact(kpis?.totalTokens ?? 0, locale)} />
-            {unavailable ? (
-              <EmptyState label={t.tokenUnavailable} />
-            ) : (
-              <>
-                <ChartBoundary name="Token Trend">
-                  <TokenTrendChart data={overview?.tokenComposition ?? []} locale={locale} />
-                </ChartBoundary>
-                <ChartLegend items={tokenLegend} />
-              </>
-            )}
+            <DataGuard unavailable={unavailable} label={t.tokenUnavailable} name="Token Trend">
+              <TokenTrendChart data={overview?.tokenComposition ?? []} locale={locale} noDataLabel={t.noData} />
+              <ChartLegend items={tokenLegend} />
+            </DataGuard>
           </div>
 
           {/* ── Token Composition ── */}
           <div className="card fade-up p-6" style={{ animationDelay: '250ms' }}>
             <SectionHeader title={t.tokenComposition} stat={unavailable ? t.unavailable : undefined} />
-            {unavailable ? (
-              <EmptyState label={t.tokenUnavailable} />
-            ) : (
-              <>
-                <ChartBoundary name="Token Composition">
-                  <TokenCompositionChart data={overview?.tokenComposition ?? []} locale={locale} />
-                </ChartBoundary>
-                <ChartLegend items={tokenLegend} />
-              </>
-            )}
+            <DataGuard unavailable={unavailable} label={t.tokenUnavailable} name="Token Composition">
+              <TokenCompositionChart data={overview?.tokenComposition ?? []} locale={locale} noDataLabel={t.noData} />
+              <ChartLegend items={tokenLegend} />
+            </DataGuard>
           </div>
 
           {/* ── Flow & Share ── */}
           <div className="fade-up grid gap-4 lg:grid-cols-5" style={{ animationDelay: '300ms' }}>
             <div className="card p-6 lg:col-span-3">
               <SectionHeader title={t.tokenFlow} />
-              {unavailable ? (
-                <EmptyState label={t.tokenUnavailable} />
-              ) : (
-                <ChartBoundary name="Token Flow">
-                  <FlowChart data={overview?.sankey} />
-                </ChartBoundary>
-              )}
+              <DataGuard unavailable={unavailable} label={t.tokenUnavailable} name="Token Flow">
+                <FlowChart data={overview?.sankey} />
+              </DataGuard>
             </div>
             <div className="card flex flex-col p-6 lg:col-span-2">
               {unavailable ? (
@@ -586,14 +568,14 @@ export function App() {
                       colors={getChartColors(isDark)}
                       centerLabel={formatUsd(overview?.totalCostUsd ?? 0)}
                     />
-                    <div className="my-5 border-t border-slate-100 dark:border-white/[0.08]" />
+                    <div className="my-5 border-t border-[var(--ai-border)]" />
                     <DonutSection
                       title={t.modelShare}
                       data={(overview?.modelCostShare ?? []).map((m) => ({ ...m, label: formatModelName(m.label, isMobile) }))}
                       colors={getChartColors(isDark)}
                       centerLabel={formatUsd(overview?.totalCostUsd ?? 0)}
                     />
-                    <div className="my-5 border-t border-slate-100 dark:border-white/[0.08]" />
+                    <div className="my-5 border-t border-[var(--ai-border)]" />
                     <DonutSection
                       title={t.deviceShare}
                       data={(overview?.filters.options.devices ?? []).map((d) => ({
@@ -615,59 +597,37 @@ export function App() {
       )}
 
       {/* ── Footer ── */}
-      <footer className="fade-up mt-16 border-t border-slate-100 dark:border-white/[0.08] pb-10 pt-8">
+      <footer className="fade-up mt-16 border-t border-[var(--ai-border)] pb-10 pt-8">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-3 text-[12px] text-slate-400 dark:text-slate-500">
-            <span className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-              <FooterLogo />
-              {SITE_TITLE}
+          {health?.version && (
+            <span className="rounded-full bg-[var(--ai-surface-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--ai-muted)]">
+              v{health.version}
             </span>
-            {health?.version && (
-              <span className="rounded-full bg-slate-100 dark:bg-[#1a1a1a] px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                v{health.version}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-[11px] text-slate-300 dark:text-slate-600">
-            <div className="flex items-center gap-4">
-              <a
-                href="/pricing"
-                className="text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-              >
-                {t.pricing}
-              </a>
-              <span className="h-3 w-px bg-slate-200 dark:bg-[#222222]" />
-              <a
-                href="/embed/docs"
-                className="text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-              >
-                {t.embedWidgets}
-              </a>
-            </div>
-            <div className="flex items-center gap-4">
-              <a
-                href="https://github.com/ennann/aiusage"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-              >
-                <Github className="h-3.5 w-3.5" />
-                <span>GitHub</span>
-              </a>
-              <span className="h-3 w-px bg-slate-200 dark:bg-[#222222]" />
-              <span className="flex items-center gap-1">
-                Made with <Heart className="h-3 w-3 fill-red-300 text-red-300" /> by{' '}
-                <a
-                  href="https://x.com/qingnianxiaozhe"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                >
-                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-                  qingnianxiaozhe
-                </a>
-              </span>
-            </div>
+          )}
+          <div className="flex items-center gap-4 text-[11px]">
+            <a
+              href="/pricing"
+              className="text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+            >
+              {t.pricing}
+            </a>
+            <span className="h-3 w-px bg-[var(--ai-border)]" />
+            <a
+              href="/embed/docs"
+              className="text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+            >
+              {t.embedWidgets}
+            </a>
+            <span className="h-3 w-px bg-[var(--ai-border)]" />
+            <a
+              href="https://github.com/Jozoazhua/aiusage"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-[var(--ai-muted)] transition-colors hover:text-[var(--ai-text)]"
+            >
+              <Github className="h-3.5 w-3.5" />
+              <span>GitHub</span>
+            </a>
           </div>
         </div>
       </footer>

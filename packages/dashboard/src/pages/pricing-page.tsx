@@ -255,7 +255,34 @@ function ProductTable({
           {sortedModels.length} {t.models.toLowerCase()}
         </span>
       </div>
-      <div className="overflow-x-auto scrollbar-hide">
+
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-2">
+        {sortedModels.map(([model, pricing]) => (
+          <div key={model} className="rounded-lg border border-slate-100 dark:border-white/[0.06] p-3">
+            <div className="mb-2 font-mono text-[12px] font-medium text-slate-700 dark:text-slate-300 break-all">{model}</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+              <span className="text-slate-400 dark:text-slate-500">{t.inputPrice}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.input_per_million_usd)}</span>
+              <span className="text-slate-400 dark:text-slate-500">{t.outputPrice}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.output_per_million_usd)}</span>
+              <span className="text-slate-400 dark:text-slate-500">{t.cacheHitPrice}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cached_input_per_million_usd)}</span>
+              {isAnthropic && (
+                <>
+                  <span className="text-slate-400 dark:text-slate-500">{t.cacheWrite5m}</span>
+                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cache_write_5m_per_million_usd, true)}</span>
+                  <span className="text-slate-400 dark:text-slate-500">{t.cacheWrite1h}</span>
+                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cache_write_1h_per_million_usd, true)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table view */}
+      <div className="hidden sm:block overflow-x-auto scrollbar-hide">
         <table className="w-full border-collapse whitespace-nowrap">
           <thead>
             <tr>

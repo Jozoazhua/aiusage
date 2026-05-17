@@ -15,12 +15,14 @@ import { useIsDark } from '../hooks/use-dark';
 export function CostTrendChart({
   data,
   providerTrend,
+  noDataLabel = 'No data',
 }: {
   data: OverviewPayload['dailyTrend'];
   providerTrend: OverviewPayload['providerDailyTrend'];
+  noDataLabel?: string;
 }) {
   const isDark = useIsDark();
-  if (!data.length) return <EmptyState label="No data" />;
+  if (!data.length) return <EmptyState label={noDataLabel} />;
 
   const { data: pivoted, providers } = useMemo(
     () => pivotProviderTrend(data, providerTrend),

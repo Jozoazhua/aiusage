@@ -27,8 +27,24 @@ export function EmptyState({ label }: { label: string }) {
 }
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-slate-100 dark:bg-[#1a1a1a] ${className}`} />;
+  return <div className={`skeleton-shimmer rounded-lg ${className}`} />;
 }
+
+export function DataGuard({
+  unavailable,
+  label,
+  name,
+  children,
+}: {
+  unavailable: boolean;
+  label: string;
+  name: string;
+  children: React.ReactNode;
+}) {
+  if (unavailable) return <EmptyState label={label} />;
+  return <ChartBoundary name={name}>{children}</ChartBoundary>;
+}
+
 
 export function SectionHeader({ title, stat }: { title: string; stat?: string }) {
   return (

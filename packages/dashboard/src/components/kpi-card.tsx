@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ArrowRightLeft } from 'lucide-react';
 import { toggleCurrency, useCurrencyStore } from '../hooks/use-cny-rate';
-
 export function KpiCard({
   label,
   value,

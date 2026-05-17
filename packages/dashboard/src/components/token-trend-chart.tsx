@@ -11,9 +11,9 @@ import { formatCompact, formatNumber, shortDate, longDate } from '../utils/forma
 import { EmptyState } from './chart-helpers';
 import { useIsDark } from '../hooks/use-dark';
 
-export function TokenTrendChart({ data, locale }: { data: OverviewPayload['tokenComposition']; locale: Locale }) {
+export function TokenTrendChart({ data, locale, noDataLabel = 'No data' }: { data: OverviewPayload['tokenComposition']; locale: Locale; noDataLabel?: string }) {
   const isDark = useIsDark();
-  if (!data.length) return <EmptyState label="No data" />;
+  if (!data.length) return <EmptyState label={noDataLabel} />;
   return (
     <ChartContainer config={getTokenConfig(isDark)} className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
