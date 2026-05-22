@@ -238,7 +238,7 @@ async function main() {
         "directory": "../dashboard/dist",
         "html_handling": "auto-trailing-slash",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/pricing", "/favicon.ico"]
+        "run_worker_first": ["/api/*", "/favicon.ico"]
     },
     "d1_databases": [
         {

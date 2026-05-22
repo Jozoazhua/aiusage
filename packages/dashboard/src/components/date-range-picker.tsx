@@ -33,20 +33,6 @@ function localToday(): Date {
   return d;
 }
 
-function daysAgo(n: number): Date {
-  const d = localToday();
-  d.setDate(d.getDate() - n);
-  return d;
-}
-
-function presetDates(r: string): { from: Date | undefined; to: Date | undefined } {
-  const today = localToday();
-  if (r === 'today') return { from: today, to: today };
-  if (r === '7d')    return { from: daysAgo(6),  to: today };
-  if (r === '30d')   return { from: daysAgo(29), to: today };
-  return { from: undefined, to: undefined };
-}
-
 function customLabel(dateFrom: string, dateTo: string, locale: Locale): string {
   if (!dateFrom || !dateTo) return '';
   const loc = locale === 'zh' ? 'zh-CN' : 'en-US';
@@ -65,13 +51,11 @@ export function DateRangePicker({ range, dateFrom, dateTo, onChange, locale, t }
   const ref = useRef<HTMLDivElement>(null);
   const today = localToday();
 
-  // Sync calendar when panel opens
+  // Sync calendar from the last confirmed custom range when panel opens.
   useEffect(() => {
     if (!open) return;
     if (range === 'custom') {
       setTempSelected({ from: toDate(dateFrom), to: toDate(dateTo) });
-    } else {
-      setTempSelected(presetDates(range));
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -87,6 +71,7 @@ export function DateRangePicker({ range, dateFrom, dateTo, onChange, locale, t }
 
   const handlePreset = (r: string) => {
     onChange({ range: r, dateFrom: '', dateTo: '' });
+    setTempSelected({ from: undefined, to: undefined });
     setOpen(false);
   };
 
@@ -159,6 +144,7 @@ export function DateRangePicker({ range, dateFrom, dateTo, onChange, locale, t }
               selected={tempSelected}
               onSelect={(sel) => setTempSelected(sel ?? { from: undefined, to: undefined })}
               disabled={{ after: today }}
+              endMonth={today}
               defaultMonth={tempSelected.from ?? today}
               locale={locale === 'zh' ? 'zh-CN' as never : 'en-US' as never}
             />
