@@ -1,25 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { catalog as localPricingCatalog } from '@aiusage/shared';
+import type { ModelPricing, PricingCatalog } from '@aiusage/shared';
 import { useLayout } from '../components/layout';
 import type { T } from '../i18n';
-
-// ────────────────────────────────────────
-// Types
-// ────────────────────────────────────────
-
-interface ModelPricing {
-  input_per_million_usd: number;
-  output_per_million_usd: number;
-  cached_input_per_million_usd: number | null;
-  cache_write_5m_per_million_usd: number;
-  cache_write_1h_per_million_usd: number;
-}
-
-interface PricingCatalog {
-  version: string;
-  aliases: Record<string, string>;
-  providers: Record<string, Record<string, { models: Record<string, ModelPricing> }>>;
-}
 
 // ────────────────────────────────────────
 // Provider branding
@@ -99,16 +83,37 @@ const LOGO_COMPONENTS: Record<string, (props: { className?: string }) => JSX.Ele
 // Helpers
 // ────────────────────────────────────────
 
-function formatPrice(value: number | null, treatZeroAsDash = false): string {
-  if (value === null) return '--';
+function formatPrice(value: number | null | undefined, currency: string, treatZeroAsDash = false): string {
+  if (value === null || value === undefined) return '--';
   if (treatZeroAsDash && value === 0) return '--';
-  if (value === 0) return '$0.00';
-  if (value >= 1) return `$${value.toFixed(2)}`;
+  const symbol = currency === 'CNY' ? '¥' : '$';
+  if (value === 0) return `${symbol}0.00`;
+  if (value >= 1) return `${symbol}${value.toFixed(2)}`;
   const s = value.toString();
   const decimalPart = s.includes('.') ? s.split('.')[1] : '';
   const minDecimals = 2;
   const sigDigits = Math.max(minDecimals, decimalPart.length);
-  return `$${value.toFixed(sigDigits)}`;
+  return `${symbol}${value.toFixed(sigDigits)}`;
+}
+
+function getInputPrice(pricing: ModelPricing): number | undefined {
+  return pricing.input_per_million ?? pricing.tiers?.[0]?.input_per_million;
+}
+
+function getOutputPrice(pricing: ModelPricing): number | undefined {
+  return pricing.output_per_million ?? pricing.tiers?.[0]?.output_per_million;
+}
+
+function getCachedInputPrice(pricing: ModelPricing): number | null | undefined {
+  return pricing.cached_input_per_million ?? pricing.tiers?.[0]?.cached_input_per_million;
+}
+
+function getCacheWrite5mPrice(pricing: ModelPricing): number | undefined {
+  return pricing.cache_write_5m_per_million ?? pricing.tiers?.[0]?.cache_write_5m_per_million;
+}
+
+function getCacheWrite1hPrice(pricing: ModelPricing): number | undefined {
+  return pricing.cache_write_1h_per_million ?? pricing.tiers?.[0]?.cache_write_1h_per_million;
 }
 
 function countProducts(
@@ -263,17 +268,17 @@ function ProductTable({
             <div className="mb-2 font-mono text-[12px] font-medium text-slate-700 dark:text-slate-300 break-all">{model}</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
               <span className="text-slate-400 dark:text-slate-500">{t.inputPrice}</span>
-              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.input_per_million_usd)}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(getInputPrice(pricing), pricing.currency)}</span>
               <span className="text-slate-400 dark:text-slate-500">{t.outputPrice}</span>
-              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.output_per_million_usd)}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(getOutputPrice(pricing), pricing.currency)}</span>
               <span className="text-slate-400 dark:text-slate-500">{t.cacheHitPrice}</span>
-              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cached_input_per_million_usd)}</span>
+              <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(getCachedInputPrice(pricing), pricing.currency)}</span>
               {isAnthropic && (
                 <>
                   <span className="text-slate-400 dark:text-slate-500">{t.cacheWrite5m}</span>
-                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cache_write_5m_per_million_usd, true)}</span>
+                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(getCacheWrite5mPrice(pricing), pricing.currency, true)}</span>
                   <span className="text-slate-400 dark:text-slate-500">{t.cacheWrite1h}</span>
-                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(pricing.cache_write_1h_per_million_usd, true)}</span>
+                  <span className="text-right tabular-nums text-slate-700 dark:text-slate-400">{formatPrice(getCacheWrite1hPrice(pricing), pricing.currency, true)}</span>
                 </>
               )}
             </div>
@@ -317,23 +322,23 @@ function ProductTable({
                   {model}
                 </td>
                 <td className="border-b border-slate-50 px-3 py-2 text-right tabular-nums text-[13px] text-slate-700 group-last:border-b-0 dark:border-white/[0.04] dark:text-slate-400">
-                  {formatPrice(pricing.input_per_million_usd)}
+                  {formatPrice(getInputPrice(pricing), pricing.currency)}
                 </td>
                 <td className="border-b border-slate-50 px-3 py-2 text-right tabular-nums text-[13px] text-slate-700 group-last:border-b-0 dark:border-white/[0.04] dark:text-slate-400">
-                  {formatPrice(pricing.cached_input_per_million_usd)}
+                  {formatPrice(getCachedInputPrice(pricing), pricing.currency)}
                 </td>
                 {isAnthropic && (
                   <>
                     <td className="border-b border-slate-50 px-3 py-2 text-right tabular-nums text-[13px] text-slate-700 group-last:border-b-0 dark:border-white/[0.04] dark:text-slate-400">
-                      {formatPrice(pricing.cache_write_5m_per_million_usd)}
+                      {formatPrice(getCacheWrite5mPrice(pricing), pricing.currency)}
                     </td>
                     <td className="border-b border-slate-50 px-3 py-2 text-right tabular-nums text-[13px] text-slate-700 group-last:border-b-0 dark:border-white/[0.04] dark:text-slate-400">
-                      {formatPrice(pricing.cache_write_1h_per_million_usd)}
+                      {formatPrice(getCacheWrite1hPrice(pricing), pricing.currency)}
                     </td>
                   </>
                 )}
                 <td className="border-b border-slate-50 px-3 py-2 text-right tabular-nums text-[13px] text-slate-700 group-last:border-b-0 dark:border-white/[0.04] dark:text-slate-400">
-                  {formatPrice(pricing.output_per_million_usd)}
+                  {formatPrice(getOutputPrice(pricing), pricing.currency)}
                 </td>
               </tr>
             ))}
@@ -418,7 +423,6 @@ function AliasesSection({
 export function PricingPage() {
   const { locale, t, isDark } = useLayout();
   const [catalog, setCatalog] = useState<PricingCatalog | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -429,8 +433,8 @@ export function PricingPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: PricingCatalog = await res.json();
         if (!cancelled) setCatalog(data);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } catch {
+        if (!cancelled) setCatalog(localPricingCatalog);
       }
     })();
     return () => { cancelled = true; };
@@ -440,27 +444,13 @@ export function PricingPage() {
     setCollapsed((prev) => ({ ...prev, [provider]: !prev[provider] }));
 
   // Loading
-  if (!catalog && !error) {
+  if (!catalog) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
         <span className="text-[13px] text-slate-400 dark:text-slate-500">{t.loadingPricing}</span>
       </div>
     );
   }
-
-  // Error
-  if (error) {
-    return (
-      <div className="card flex min-h-[320px] flex-col items-center justify-center p-8">
-        <div className="mb-1.5 text-[13px] text-slate-400 dark:text-slate-500">
-          {t.failedLoadPricing}
-        </div>
-        <div className="text-[13px] text-red-500/80">{error}</div>
-      </div>
-    );
-  }
-
-  if (!catalog) return null;
 
   // Sort providers by defined order
   const sortedProviders = Object.entries(catalog.providers).sort(([a], [b]) => {
