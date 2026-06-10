@@ -348,6 +348,16 @@ export function App() {
 
       </header>
 
+      {isDemo && (
+        <div
+          role="status"
+          className="mb-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />
+          {t.demoBanner}
+        </div>
+      )}
+
         {/* ── Range + Filters (desktop) ── */}
         <div className="mt-2 mb-6 hidden sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
           <div className="flex items-center gap-2">
@@ -529,16 +539,26 @@ export function App() {
           <div className="card fade-up p-6" style={{ animationDelay: '200ms' }}>
             <SectionHeader title={t.tokenTrend} stat={unavailable ? t.unavailable : formatCompact(kpis?.totalTokens ?? 0, locale)} />
             <DataGuard unavailable={unavailable} label={t.tokenUnavailable} name="Token Trend">
-              <TokenTrendChart data={overview?.tokenComposition ?? []} locale={locale} noDataLabel={t.noData} />
+              <TokenTrendChart
+                data={overview?.tokenComposition ?? []}
+                locale={locale}
+                noDataLabel={t.noData}
+                totalLabel={t.total}
+              />
               <ChartLegend items={tokenLegend} />
             </DataGuard>
           </div>
 
           {/* ── Token Composition ── */}
           <div className="card fade-up p-6" style={{ animationDelay: '250ms' }}>
-            <SectionHeader title={t.tokenComposition} stat={unavailable ? t.unavailable : undefined} />
+            <SectionHeader title={t.tokenComposition} stat={unavailable ? t.unavailable : formatCompact(kpis?.totalTokens ?? 0, locale)} />
             <DataGuard unavailable={unavailable} label={t.tokenUnavailable} name="Token Composition">
-              <TokenCompositionChart data={overview?.tokenComposition ?? []} locale={locale} noDataLabel={t.noData} />
+              <TokenCompositionChart
+                data={overview?.tokenComposition ?? []}
+                locale={locale}
+                noDataLabel={t.noData}
+                totalLabel={t.total}
+              />
               <ChartLegend items={tokenLegend} />
             </DataGuard>
           </div>

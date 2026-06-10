@@ -53,6 +53,8 @@ export const I18N = {
     filterDevice: 'Filter by Device', filterProduct: 'Filter by Product', items: 'Items',
     activityHeatmap: 'Activity Heatmap',
     dayStreak: 'day streak', noActivity: 'No activity', noActivityData: 'No activity data in the past year.',
+    demoBanner: 'Demo data — backend unavailable, showing sample numbers',
+    total: 'Total',
   },
   zh: {
     estimatedCost: '预估费用', totalTokens: '总 Token',
@@ -101,6 +103,8 @@ export const I18N = {
     filterDevice: '按设备筛选', filterProduct: '按产品筛选', items: '子项',
     activityHeatmap: '年度活跃热力图',
     dayStreak: '连续天', noActivity: '无活动', noActivityData: '过去一年暂无活动数据。',
+    demoBanner: '演示数据 — 后端无法连接，以下为示例数字',
+    total: '合计',
   },
 } as const;
 

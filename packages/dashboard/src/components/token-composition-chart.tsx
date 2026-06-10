@@ -7,11 +7,21 @@ import {
 import type { OverviewPayload } from '../hooks/use-overview';
 import type { Locale } from '../i18n';
 import { TOKEN_SERIES, getTokenConfig, getTokenColor } from '../constants';
-import { formatCompact, formatNumber, shortDate, longDate } from '../utils/format';
+import { formatCompact, formatTokens, shortDate, longDate } from '../utils/format';
 import { EmptyState } from './chart-helpers';
 import { useIsDark } from '../hooks/use-dark';
 
-export function TokenCompositionChart({ data, locale, noDataLabel = 'No data' }: { data: OverviewPayload['tokenComposition']; locale: Locale; noDataLabel?: string }) {
+export function TokenCompositionChart({
+  data,
+  locale,
+  noDataLabel = 'No data',
+  totalLabel,
+}: {
+  data: OverviewPayload['tokenComposition'];
+  locale: Locale;
+  noDataLabel?: string;
+  totalLabel?: string;
+}) {
   const isDark = useIsDark();
   if (!data.length) return <EmptyState label={noDataLabel} />;
   const barW = data.length <= 7 ? 94 : data.length <= 30 ? 47 : 20;
@@ -34,7 +44,10 @@ export function TokenCompositionChart({ data, locale, noDataLabel = 'No data' }:
             content={
               <ChartTooltipContent
                 labelFormatter={longDate}
-                formatter={(v) => formatNumber(Number(v))}
+                formatter={(v) => formatTokens(Number(v), locale)}
+                showTotal
+                totalLabel={totalLabel ?? 'Total'}
+                totalFormatter={(v) => formatTokens(v, locale)}
               />
             }
           />
