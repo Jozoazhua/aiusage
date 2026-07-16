@@ -8,17 +8,57 @@ import type {
 } from './types.js';
 import { catalog as defaultCatalog } from './catalog.js';
 
-const FAST_MULTIPLIER = 6;
+const ANTHROPIC_FAST_MULTIPLIER = 6;
 
 /**
- * Fast 模式 x6 仅适用以下模型（Anthropic 官方明确支持）。
- * 其它 -fast 后缀（即便 scanner 误标）按原价计算，避免被错误放大 6 倍。
+ * Fast 模式 ×6 仅适用以下模型（Anthropic 官方明确支持）。
+ * OpenAI Codex 的 fast/priority 倍率另按官方 Codex speed/API priority 口径处理。
  */
 const FAST_SUPPORTED = new Set<string>([
   'claude-opus-4-8',
   'claude-opus-4-7',
   'claude-opus-4-6',
 ]);
+
+type ServiceTierSuffix = 'fast' | 'priority' | null;
+
+const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
+  'gpt-5.6-sol': 2,
+  'gpt-5.6-terra': 2,
+  'gpt-5.6-luna': 2,
+  'gpt-5.5': 2.5,
+  'gpt-5.4': 2,
+};
+
+function splitServiceTierSuffix(model: string): { baseModel: string; tier: ServiceTierSuffix } {
+  if (model.endsWith('-priority')) {
+    return { baseModel: model.replace(/-priority$/, ''), tier: 'priority' };
+  }
+  if (model.endsWith('-fast')) {
+    return { baseModel: model.replace(/-fast$/, ''), tier: 'fast' };
+  }
+  return { baseModel: model, tier: null };
+}
+
+function getServiceTierMultiplier(
+  provider: string,
+  product: string,
+  resolvedModel: string,
+  tier: ServiceTierSuffix,
+): number {
+  if (!tier) return 1;
+
+  if (provider === 'openai' && product === 'codex') {
+    if (tier === 'fast' && resolvedModel.startsWith('gpt-5.6-')) return 1;
+    return OPENAI_CODEX_TIER_MULTIPLIERS[resolvedModel] ?? 1;
+  }
+
+  if (tier === 'fast' && FAST_SUPPORTED.has(resolvedModel)) {
+    return ANTHROPIC_FAST_MULTIPLIER;
+  }
+
+  return 1;
+}
 
 /**
  * resolveModelPricing — alias 精确匹配，再 longest-prefix fallback。
@@ -84,6 +124,8 @@ function toUsd(amount: number, currency: ModelPricing['currency'], catalog: Pric
 export interface CalculateCostOptions {
   /** 自定义 catalog，便于 Worker 用 env 覆盖汇率等参数。 */
   catalog?: PricingCatalog;
+  /** 聚合 breakdown 包含的请求/事件数；用于按平均单请求 input 估算阶梯。 */
+  requestCount?: number;
 }
 
 export function calculateCost(
@@ -105,8 +147,7 @@ export function calculateCost(
     return { estimatedCostUsd: 0, costStatus: 'exact', pricingVersion: cat.version };
   }
 
-  const isFast = model.endsWith('-fast');
-  const baseModel = isFast ? model.replace(/-fast$/, '') : model;
+  const { baseModel, tier } = splitServiceTierSuffix(model);
 
   const resolved = resolveModelPricing(cat, provider, product, baseModel);
   if (!resolved) {
@@ -121,14 +162,18 @@ export function calculateCost(
   let matchedTierIndex: number | undefined;
   if (pricing.tiers && pricing.tiers.length > 0) {
     const totalIn = tokens.inputTokens + tokens.cachedInputTokens + tokens.cacheWriteTokens;
-    const { tier, index } = selectTier(pricing.tiers, totalIn);
+    const requestCount = Math.max(1, Math.floor(options.requestCount ?? 1));
+    const tierInput = totalIn / requestCount;
+    const { tier, index } = selectTier(pricing.tiers, tierInput);
     unit = tier;
     matchedTierIndex = index;
+    if (requestCount > 1) costStatus = 'estimated';
   } else {
     unit = {
       input_per_million: pricing.input_per_million ?? 0,
       output_per_million: pricing.output_per_million ?? 0,
       cached_input_per_million: pricing.cached_input_per_million ?? null,
+      cache_write_per_million: pricing.cache_write_per_million,
       cache_write_5m_per_million: pricing.cache_write_5m_per_million ?? 0,
       cache_write_1h_per_million: pricing.cache_write_1h_per_million ?? 0,
     };
@@ -137,20 +182,25 @@ export function calculateCost(
   // cache_write_5m/1h 在阶梯档位里如果没填，回退到顶层
   const cw5Rate = unit.cache_write_5m_per_million ?? pricing.cache_write_5m_per_million ?? 0;
   const cw1hRate = unit.cache_write_1h_per_million ?? pricing.cache_write_1h_per_million ?? 0;
+  const hasGenericCacheWriteRate =
+    unit.cache_write_per_million !== undefined || pricing.cache_write_per_million !== undefined;
+  const genericCwRate = unit.cache_write_per_million ?? pricing.cache_write_per_million ?? 0;
   const cachedRate = unit.cached_input_per_million ?? pricing.cached_input_per_million ?? 0;
+  const cacheWriteCost = hasGenericCacheWriteRate
+    ? (tokens.cacheWriteTokens / 1_000_000) * genericCwRate
+    : ((tokens.cacheWrite5mTokens ?? tokens.cacheWriteTokens) / 1_000_000) * cw5Rate +
+      ((tokens.cacheWrite1hTokens ?? 0) / 1_000_000) * cw1hRate;
 
   let raw =
     (tokens.inputTokens / 1_000_000) * (unit.input_per_million ?? 0) +
     (tokens.cachedInputTokens / 1_000_000) * (cachedRate ?? 0) +
-    ((tokens.cacheWrite5mTokens ?? tokens.cacheWriteTokens) / 1_000_000) * cw5Rate +
-    ((tokens.cacheWrite1hTokens ?? 0) / 1_000_000) * cw1hRate +
+    cacheWriteCost +
     (tokens.outputTokens / 1_000_000) * (unit.output_per_million ?? 0);
 
   // 折算 currency → USD
   raw = toUsd(raw, pricing.currency, cat);
 
-  // Fast 模式 x6 仅对白名单模型生效；其它 -fast 后缀按原价
-  const finalCost = isFast && FAST_SUPPORTED.has(resolvedModel) ? raw * FAST_MULTIPLIER : raw;
+  const finalCost = raw * getServiceTierMultiplier(provider, product, resolvedModel, tier);
 
   return {
     estimatedCostUsd: Math.round(finalCost * 10000) / 10000,

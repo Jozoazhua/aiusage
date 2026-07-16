@@ -6,6 +6,7 @@ import { scanAnthropicApiDates } from './scanners/anthropic-admin-api.js';
 import { scanAnthropicCsvDates } from './scanners/anthropic-csv.js';
 import { buildLocalReport, parseReportRange } from './report.js';
 import { renderReport } from './render.js';
+import { buildActivityReport, renderActivityReport, type ActivityItem } from './activity.js';
 import {
   type AIUsageConfig,
   type SyncTarget,
@@ -23,7 +24,9 @@ import { disableSchedule, enableSchedule, formatInterval, getScheduleStatus, par
 import { runDoctor } from './doctor.js';
 import { getVersion } from './version.js';
 import { discoverProjects } from './project.js';
-import { applyPrivacy } from './privacy.js';
+import { applyPrivacy, applyProjectPrivacy } from './privacy.js';
+import type { IngestActivityItem, IngestDay } from '@aiusage/shared';
+import { getPricingStatus, resolvePricingCatalog } from './pricing.js';
 
 const argv = process.argv.slice(2);
 const command = argv[0];
@@ -40,6 +43,10 @@ try {
     const parsed = parseArgs(argv.slice(1));
     if (parsed.flags.help) return helpForSubcommand('report');
     await runReport(parsed.flags, parsed.positionals);
+  } else if (command === 'activity') {
+    const parsed = parseArgs(argv.slice(1));
+    if (parsed.flags.help) return helpForSubcommand('activity');
+    await runActivity(parsed.flags, parsed.positionals);
   } else if (command === 'health') {
     const parsed = parseArgs(argv.slice(1));
     if (parsed.flags.help) return helpForSubcommand('health');
@@ -77,6 +84,18 @@ try {
     const parsed = parseArgs(argv.slice(1));
     if (parsed.flags.help) return helpForSubcommand('doctor');
     await runDoctorCommand(parsed.flags);
+  } else if (command === 'pricing') {
+    const sub = argv[1];
+    const parsed = parseArgs(argv.slice(2));
+    if (sub === '--help' || sub === '-h' || parsed.flags.help) return helpForSubcommand('pricing');
+    if (sub === 'update') {
+      await runPricingUpdate(parsed.flags);
+    } else if (sub === 'status' || sub === undefined) {
+      await runPricingStatus(parsed.flags);
+    } else {
+      const zh = (await readConfig()).lang === 'zh';
+      throw new Error(`${zh ? '未知子命令' : 'Unknown subcommand'}: pricing ${sub}`);
+    }
   } else if (command === 'config' && argv[1] === 'set') {
     await runConfigSet(argv.slice(2));
   } else if (command === 'project') {
@@ -193,7 +212,20 @@ async function runReport(flags: Record<string, string | boolean>, positionals: s
 
   // 日期解析：--from/--start, --to/--end, --date, --today, --range, --lookback
   const { dates, range } = resolveDateParams(flags, config);
-  const report = await buildLocalReport(range, { projectAliases: config.projectAliases, dates });
+  const targetName = resolveOptionalString(flags.target, undefined);
+  const pricingTarget = targetName
+    ? findTargetOrThrow(config, targetName)
+    : config.targets?.[0];
+  const pricing = await resolvePricingCatalog(config, {
+    explicitUrl: resolveOptionalString(flags['pricing-url'], undefined),
+    target: pricingTarget,
+  });
+  const report = await buildLocalReport(range, {
+    projectAliases: config.projectAliases,
+    dates,
+    pricingCatalog: pricing.catalog,
+    pricingInfo: pricing.info,
+  });
 
   if (flags.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -205,6 +237,26 @@ async function runReport(flags: Record<string, string | boolean>, positionals: s
   const detail = flags.detail === true;
 
   console.log(renderReport(report, { lang, emoji, detail }));
+}
+
+async function runActivity(flags: Record<string, string | boolean>, positionals: string[] = []) {
+  const config = await readConfig();
+  assertNoPositionals('activity', positionals, config.lang === 'zh');
+
+  const { dates, range } = resolveDateParams(flags, config);
+  const report = await buildActivityReport(range, {
+    projectAliases: config.projectAliases,
+    dates,
+  });
+
+  if (flags.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+
+  const emoji = flags['no-emoji'] === true ? false : (config.emoji ?? true);
+  const detail = flags.detail === true;
+  console.log(renderActivityReport(report, { emoji, detail }));
 }
 
 function fmt(n: number): string {
@@ -311,11 +363,20 @@ async function runSync(flags: Record<string, string | boolean>, positionals: str
   // 扫描一次，所有 target 共享结果
   console.log(`扫描 ${targetDates.length} 天 (${targetDates[0]} ~ ${targetDates[targetDates.length - 1]}) ...`);
 
-  const results = await scanDates(targetDates, { projectAliases: config.projectAliases });
+  const [results, activityReport] = await Promise.all([
+    scanDates(targetDates, { projectAliases: config.projectAliases }),
+    buildActivityReport('all', { dates: targetDates, projectAliases: config.projectAliases }),
+  ]);
   const visibility = config.privacy?.projectVisibility;
-  const allDays = results
-    .filter(r => r.breakdowns.length > 0)
-    .map(r => ({ usageDate: r.usageDate, breakdowns: applyPrivacy(r.breakdowns, visibility) }));
+  const resultsByDate = new Map(results.map(result => [result.usageDate, result]));
+  const activityByDate = buildActivityPayloadByDate(activityReport.items, visibility);
+  const allDays: IngestDay[] = targetDates
+    .map((usageDate) => {
+      const breakdowns = applyPrivacy(resultsByDate.get(usageDate)?.breakdowns ?? [], visibility);
+      const activity = activityByDate.get(usageDate);
+      return { usageDate, breakdowns, activity };
+    })
+    .filter(day => day.breakdowns.length > 0 || (day.activity?.items.length ?? 0) > 0);
 
   if (allDays.length === 0) {
     console.log('没有可上传的数据。');
@@ -371,6 +432,31 @@ async function runSync(flags: Record<string, string | boolean>, positionals: str
     uploadedDays: allDays.map(day => day.usageDate),
     results: uploadResults,
   }, null, 2));
+}
+
+function buildActivityPayloadByDate(
+  items: ActivityItem[],
+  visibility: Parameters<typeof applyProjectPrivacy>[1],
+): Map<string, { items: IngestActivityItem[] }> {
+  const map = new Map<string, { items: IngestActivityItem[] }>();
+  const sanitized = applyProjectPrivacy(items, visibility);
+  for (const item of sanitized) {
+    const day = map.get(item.usageDate) ?? { items: [] };
+    day.items.push({
+      provider: item.provider,
+      product: item.product,
+      source: item.source,
+      project: item.project,
+      projectDisplay: item.projectDisplay,
+      projectAlias: item.projectAlias,
+      kind: item.kind,
+      name: item.name,
+      count: item.count,
+      confidence: item.confidence,
+    });
+    map.set(item.usageDate, day);
+  }
+  return map;
 }
 
 async function runImport(flags: Record<string, string | boolean>, positionals: string[] = []) {
@@ -564,6 +650,43 @@ async function runDoctorCommand(flags: Record<string, string | boolean>) {
   if (failures.length > 0) process.exitCode = 1;
 }
 
+async function runPricingStatus(flags: Record<string, string | boolean>) {
+  const config = await readConfig();
+  const status = await getPricingStatus(config);
+  if (flags.json) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+
+  console.log(`模式: ${status.mode}`);
+  if (status.configuredUrl) console.log(`配置源: ${status.configuredUrl}`);
+  console.log(`缓存: ${status.cachePath}`);
+  if (status.cache) {
+    console.log(`缓存版本: ${status.cache.version}`);
+    console.log(`缓存来源: ${status.cache.sourceUrl}`);
+    console.log(`缓存时间: ${status.cache.fetchedAt}`);
+  } else {
+    console.log('缓存版本: (无)');
+  }
+  console.log(`内置版本: ${status.bundled.version}`);
+}
+
+async function runPricingUpdate(flags: Record<string, string | boolean>) {
+  const config = await readConfig();
+  const targetName = resolveOptionalString(flags.target, undefined);
+  const target = targetName ? findTargetOrThrow(config, targetName) : config.targets?.[0];
+  const pricing = await resolvePricingCatalog(config, {
+    forceRefresh: true,
+    explicitUrl: resolveOptionalString(flags.url, undefined),
+    target,
+  });
+
+  console.log(JSON.stringify({
+    cachePath: (await getPricingStatus(config)).cachePath,
+    pricing: pricing.info,
+  }, null, 2));
+}
+
 async function runConfigSet(args: string[]) {
   const [keyPath, ...values] = args;
   if (!keyPath) throw new Error('config set 缺少配置项');
@@ -675,9 +798,11 @@ function printHelp(zh = false) {
   const cmds = zh ? [
     ['scan [--date YYYY-MM-DD|--today|--range 7d|1m|3m] [--json]', '扫描用量明细'],
     ['report [--today] [--range 7d|1m|3m|all] [--detail] [--json]', '本地用量报告'],
+    ['activity [--today] [--range 7d|1m|3m|all] [--detail] [--json]', '本地交互指标'],
     ['sync [--today] [--range 7d|1m|3m]',                         '上传用量到服务端'],
     ['scan/report/sync --from YYYY-MM-DD [--to YYYY-MM-DD]',      '指定日期范围（--start/--end 同义）'],
     ['project [list|alias]',                                  '项目管理与别名设置'],
+    ['pricing [status|update] [--url URL]',                   '查看/更新定价目录'],
     ['schedule [on|off|status] [--every 5m]',                '定时同步管理'],
     ['doctor',                                               '诊断检查'],
     ['config set <key> <value>',                             '修改配置'],
@@ -687,9 +812,11 @@ function printHelp(zh = false) {
   ] : [
     ['scan [--date YYYY-MM-DD|--today|--range 7d|1m|3m] [--json]', 'Scan usage breakdown'],
     ['report [--today] [--range 7d|1m|3m|all] [--detail] [--json]', 'Local usage report'],
+    ['activity [--today] [--range 7d|1m|3m|all] [--detail] [--json]', 'Local interaction metrics'],
     ['sync [--today] [--range 7d|1m|3m]',                         'Upload usage to server'],
     ['scan/report/sync --from YYYY-MM-DD [--to YYYY-MM-DD]',      'Date range (--start/--end aliases)'],
     ['project [list|alias]',                                 'Project management & aliases'],
+    ['pricing [status|update] [--url URL]',                  'Pricing catalog management'],
     ['schedule [on|off|status] [--every 5m]',                'Scheduled sync management'],
     ['doctor',                                               'Run diagnostics'],
     ['config set <key> <value>',                             'Update config'],
@@ -714,16 +841,20 @@ function printUsageHint(zh = false) {
   const cmds = zh ? [
     ['scan [--date YYYY-MM-DD|--range 1m]',   '扫描用量明细'],
     ['report [--today] [--range 7d|1m|3m|all]', '本地用量报告'],
+    ['activity [--range 7d|1m|3m|all]',       '本地交互指标'],
     ['sync [--today] [--range 7d|1m|3m]',     '上传用量到服务端'],
     ['project [list|alias]',                  '项目管理与别名设置'],
+    ['pricing [status|update]',               '查看/更新定价目录'],
     ['schedule [on|off|status]',              '定时同步管理'],
     ['doctor',                                '诊断检查'],
     ['config set <key> <value>',              '修改配置'],
   ] : [
     ['scan [--date YYYY-MM-DD|--range 1m]',   'Scan usage breakdown'],
     ['report [--today] [--range 7d|1m|3m|all]', 'Local usage report'],
+    ['activity [--range 7d|1m|3m|all]',       'Local interaction metrics'],
     ['sync [--today] [--range 7d|1m|3m]',     'Upload usage to server'],
     ['project [list|alias]',                  'Project management & aliases'],
+    ['pricing [status|update]',               'Pricing catalog management'],
     ['schedule [on|off|status]',              'Scheduled sync management'],
     ['doctor',                                'Run diagnostics'],
     ['config set <key> <value>',              'Update config'],

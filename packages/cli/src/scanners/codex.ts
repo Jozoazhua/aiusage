@@ -1,12 +1,13 @@
-import { readdir, open } from 'node:fs/promises';
+import { readdir, open, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
-import type { IngestBreakdown } from '@aiusage/shared';
+import { calculateCost, type IngestBreakdown } from '@aiusage/shared';
 import { normalizeModelName, runWithConcurrency, resolveProjectFields, type ProjectFields } from './utils.js';
 
 const FILE_CONCURRENCY = 16;
 const MAX_LINE_BYTES = 64 * 1024 * 1024; // 64 MB
+type CodexServiceTier = 'fast' | 'priority' | null;
 
 interface CodexRecord {
   type?: string;
@@ -49,6 +50,7 @@ export async function scanCodexDates(
   for (const targetDate of targetDateSet) groupedByDate.set(targetDate, new Map());
 
   const baseDir = codexDir ?? join(homedir(), '.codex');
+  const serviceTier = await detectCodexServiceTier(baseDir);
 
   const sessionFiles = await collectSessionFiles(baseDir);
   if (sessionFiles.length === 0) {
@@ -60,7 +62,7 @@ export async function scanCodexDates(
 
   // 并发流式处理文件
   await runWithConcurrency(sessionFiles, FILE_CONCURRENCY, async (filePath) => {
-    await processCodexFile(filePath, targetDateSet, projectAliases, groupedByDate, globalSeenSigs);
+    await processCodexFile(filePath, targetDateSet, projectAliases, groupedByDate, globalSeenSigs, serviceTier);
   });
 
   return new Map(
@@ -75,6 +77,7 @@ async function processCodexFile(
   projectAliases: Record<string, string> | undefined,
   groupedByDate: Map<string, Map<string, IngestBreakdown>>,
   globalSeenSigs: Set<string>,
+  serviceTier: CodexServiceTier,
 ): Promise<void> {
   let fh;
   try {
@@ -110,7 +113,7 @@ async function processCodexFile(
         const rawModel = record.payload?.model ?? currentModel;
         // 过滤合成消息
         if (rawModel !== '<synthetic>') {
-          currentModel = normalizeModelName(rawModel);
+          currentModel = applyCodexServiceTier(normalizeModelName(rawModel), serviceTier);
         }
         if (record.payload?.cwd) {
           currentProjectFields = resolveProjectFields(record.payload.cwd, projectAliases);
@@ -129,8 +132,18 @@ async function processCodexFile(
       const usageDate = toDateKey(ts);
       if (!targetDateSet.has(usageDate)) continue;
 
-      // 按 total_token_usage 签名跨文件全局去重
+      // 跨文件全局去重：total_token_usage 在会话内单调累加，相同的非零累计值
+      // 只可能来自 fork/resume 复制行或重复 emit，可安全去重。
       const total = info.total_token_usage;
+      const totalSum =
+        (total.input_tokens ?? 0) +
+        (total.cached_input_tokens ?? 0) +
+        (total.output_tokens ?? 0) +
+        (total.reasoning_output_tokens ?? 0) +
+        (total.total_tokens ?? 0);
+      // 全零累计是每个会话开头都有的噪声，跨会话签名相同会被误杀，
+      // 故全零既不参与去重也不计入用量（last 也必为 0，无影响）。
+      if (totalSum === 0) continue;
       const signature = `${total.input_tokens ?? 0}|${total.cached_input_tokens ?? 0}|${total.output_tokens ?? 0}|${total.reasoning_output_tokens ?? 0}|${total.total_tokens ?? 0}`;
       if (globalSeenSigs.has(signature)) continue;
       globalSeenSigs.add(signature);
@@ -147,6 +160,15 @@ async function processCodexFile(
       // In Codex JSONL, input_tokens includes cached_input_tokens.
       // Subtract to get the non-cached portion so cost formula works uniformly.
       const nonCachedInput = Math.max(0, (last.input_tokens ?? 0) - (last.cached_input_tokens ?? 0));
+      const cachedInput = last.cached_input_tokens ?? 0;
+      const output = last.output_tokens ?? 0;
+      const eventCost = calculateCost('openai', 'codex', currentModel, {
+        inputTokens: nonCachedInput,
+        cachedInputTokens: cachedInput,
+        cacheWriteTokens: 0,
+        outputTokens: output,
+      });
+      const exactEventCost = eventCost.costStatus === 'exact' ? eventCost.estimatedCostUsd : undefined;
 
       const grouped = groupedByDate.get(usageDate);
       if (!grouped) continue;
@@ -156,11 +178,15 @@ async function processCodexFile(
       if (existing) {
         existing.eventCount += 1;
         existing.inputTokens += nonCachedInput;
-        existing.cachedInputTokens += last.cached_input_tokens ?? 0;
-        existing.outputTokens += last.output_tokens ?? 0;
+        existing.cachedInputTokens += cachedInput;
+        existing.outputTokens += output;
         existing.reasoningOutputTokens += last.reasoning_output_tokens ?? 0;
+        if (exactEventCost !== undefined) {
+          existing.costUSD = (existing.costUSD ?? 0) + exactEventCost;
+          existing.pricingVersion = eventCost.pricingVersion;
+        }
       } else {
-        grouped.set(key, {
+        const breakdown: IngestBreakdown = {
           provider: 'openai',
           product: 'codex',
           channel: 'cli',
@@ -170,11 +196,16 @@ async function processCodexFile(
           projectAlias: currentProjectFields.projectAlias,
           eventCount: 1,
           inputTokens: nonCachedInput,
-          cachedInputTokens: last.cached_input_tokens ?? 0,
+          cachedInputTokens: cachedInput,
           cacheWriteTokens: 0,
-          outputTokens: last.output_tokens ?? 0,
+          outputTokens: output,
           reasoningOutputTokens: last.reasoning_output_tokens ?? 0,
-        });
+        };
+        if (exactEventCost !== undefined) {
+          breakdown.costUSD = exactEventCost;
+          breakdown.pricingVersion = eventCost.pricingVersion;
+        }
+        grouped.set(key, breakdown);
       }
     }
   } finally {
@@ -199,6 +230,38 @@ async function collectSessionFiles(baseDir: string): Promise<string[]> {
   await walkDir(sessionsDir, paths);
 
   return paths;
+}
+
+async function detectCodexServiceTier(baseDir: string): Promise<CodexServiceTier> {
+  let config = '';
+  try {
+    config = await readFile(join(baseDir, 'config.toml'), 'utf-8');
+  } catch {
+    return null;
+  }
+
+  const serviceTier = config.match(/^\s*service_tier\s*=\s*["']([^"']+)["']/m)?.[1]?.trim().toLowerCase();
+  if (serviceTier === 'priority') return 'priority';
+  if (serviceTier === 'fast') return 'fast';
+
+  const fastMode = config.match(/^\s*fast_mode\s*=\s*(true|false)\s*$/m)?.[1];
+  return fastMode === 'true' ? 'fast' : null;
+}
+
+function applyCodexServiceTier(model: string, serviceTier: CodexServiceTier): string {
+  if (!serviceTier) return model;
+  if (model.endsWith('-fast') || model.endsWith('-priority')) return model;
+  const supportsFast = model === 'gpt-5.5' || model === 'gpt-5.4';
+  const supportsPriority =
+    model === 'gpt-5.6' ||
+    model === 'gpt-5.6-sol' ||
+    model === 'gpt-5.6-terra' ||
+    model === 'gpt-5.6-luna' ||
+    supportsFast;
+  if ((serviceTier === 'fast' && supportsFast) || (serviceTier === 'priority' && supportsPriority)) {
+    return `${model}-${serviceTier}`;
+  }
+  return model;
 }
 
 async function walkDir(dir: string, result: string[]): Promise<void> {
@@ -234,4 +297,3 @@ function toDateKey(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
-

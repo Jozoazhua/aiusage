@@ -11,15 +11,18 @@ import { formatUsd, formatUsdFull, shortDate, longDate } from '../utils/format';
 import { pivotProviderTrend } from '../utils/data';
 import { EmptyState, ChartLegend } from './chart-helpers';
 import { useIsDark } from '../hooks/use-dark';
+import type { CurrencyMode } from '../hooks/use-cny-rate';
 
 export function CostTrendChart({
   data,
   providerTrend,
   noDataLabel = 'No data',
+  currency = 'auto',
 }: {
   data: OverviewPayload['dailyTrend'];
   providerTrend: OverviewPayload['providerDailyTrend'];
   noDataLabel?: string;
+  currency?: CurrencyMode;
 }) {
   const isDark = useIsDark();
   if (!data.length) return <EmptyState label={noDataLabel} />;
@@ -49,14 +52,14 @@ export function CostTrendChart({
             />
             <YAxis
               tickLine={false} axisLine={false} width={48} tickMargin={8}
-              tickFormatter={(v) => formatUsd(Number(v))} className="fill-slate-400 dark:fill-slate-500" fontSize={11}
+              tickFormatter={(v) => formatUsd(Number(v), currency)} className="fill-slate-400 dark:fill-slate-500" fontSize={11}
             />
             <ChartTooltip
               cursor={{ fill: isDark ? 'rgba(51,65,85,0.3)' : '#f8fafc' }}
               content={
                 <ChartTooltipContent
                   labelFormatter={longDate}
-                  formatter={(v) => formatUsdFull(Number(v))}
+                  formatter={(v) => formatUsdFull(Number(v), currency)}
                 />
               }
             />

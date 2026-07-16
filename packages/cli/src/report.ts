@@ -2,8 +2,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { IngestBreakdown } from '@aiusage/shared';
-import { calculateCost } from '@aiusage/shared';
+import { calculateCost, PRICING_VERSION, type PricingCatalog } from '@aiusage/shared';
 import { scanDates } from './scan.js';
+import { parseTs, dateKey } from './scanners/utils.js';
+import type { PricingInfo } from './pricing.js';
 
 export type ReportRange = '7d' | '1m' | '3m' | 'all' | 'today';
 
@@ -42,6 +44,7 @@ export interface LocalReport {
   daily: DailySummary[];
   bySource: SourceSummary[];
   byModel: ModelSummary[];
+  pricing: PricingInfo;
   pricingWarnings: string[];
 }
 
@@ -49,6 +52,8 @@ interface BuildReportOptions {
   projectAliases?: Record<string, string>;
   /** 直接传入日期列表时忽略 range 参数 */
   dates?: string[];
+  pricingCatalog?: PricingCatalog;
+  pricingInfo?: PricingInfo;
 }
 
 export async function buildLocalReport(
@@ -60,7 +65,7 @@ export async function buildLocalReport(
     : range === 'all'
     ? await discoverAllDates()
     : range === 'today'
-    ? [toDateKey(getTodayLocalDate())]
+    ? [dateKey(getTodayLocalDate())]
     : buildPresetDates(range);
 
   const daily: DailySummary[] = [];
@@ -81,7 +86,7 @@ export async function buildLocalReport(
       daysWithData += 1;
 
       for (const breakdown of result.breakdowns) {
-        const breakdownTotals = toBreakdownTotals(breakdown, pricingWarnings);
+        const breakdownTotals = toBreakdownTotals(breakdown, pricingWarnings, options.pricingCatalog);
         dayTotals.estimatedCostUsd += breakdownTotals.estimatedCostUsd;
         mergeTotals(totals, breakdownTotals);
         mergeTotals(getOrCreate(bySource, `${breakdown.provider}/${breakdown.product}`), breakdownTotals);
@@ -116,6 +121,10 @@ export async function buildLocalReport(
         return { source, model, ...summary };
       })
       .sort((a, b) => b.estimatedCostUsd - a.estimatedCostUsd || b.totalTokens - a.totalTokens),
+    pricing: options.pricingInfo ?? {
+      source: 'bundled',
+      version: options.pricingCatalog?.version ?? 'bundled',
+    },
     pricingWarnings: [...pricingWarnings].sort(),
   };
 }
@@ -150,7 +159,7 @@ function buildPresetDates(range: Exclude<ReportRange, 'all' | 'today'>): string[
   for (let offset = days - 1; offset >= 0; offset -= 1) {
     const day = new Date(today);
     day.setDate(today.getDate() - offset);
-    result.push(toDateKey(day));
+    result.push(dateKey(day));
   }
 
   return result;
@@ -187,8 +196,8 @@ async function discoverGenericJsonlDates(baseDir: string, dates: Set<string>): P
       if (!line.trim()) continue;
       let record: { timestamp?: string | number };
       try { record = JSON.parse(line); } catch { continue; }
-      const ts = parseTimestamp(record.timestamp as string | undefined);
-      if (ts) dates.add(toDateKey(ts));
+      const ts = parseTs(record.timestamp as string | undefined);
+      if (ts) dates.add(dateKey(ts));
     }
   }
 }
@@ -203,14 +212,14 @@ async function discoverGenericJsonDates(baseDir: string, dates: Set<string>): Pr
     let data: any;
     try { data = JSON.parse(content); } catch { continue; }
     // 顶层 timestamp
-    const topTs = parseTimestamp(data.timestamp ?? data.createTime);
-    if (topTs) dates.add(toDateKey(topTs));
+    const topTs = parseTs(data.timestamp ?? data.createTime);
+    if (topTs) dates.add(dateKey(topTs));
     // messages 数组
     const msgs = data.messages ?? data.history ?? [];
     if (Array.isArray(msgs)) {
       for (const msg of msgs) {
-        const ts = parseTimestamp(msg.timestamp ?? msg.createTime);
-        if (ts) dates.add(toDateKey(ts));
+        const ts = parseTs(msg.timestamp ?? msg.createTime);
+        if (ts) dates.add(dateKey(ts));
       }
     }
   }
@@ -249,14 +258,14 @@ async function discoverGeminiDates(dates: Set<string>): Promise<void> {
 
     if (Array.isArray(session)) {
       for (const row of session) {
-        const ts = parseTimestamp(row.timestamp);
-        if (ts) dates.add(toDateKey(ts));
+        const ts = parseTs(row.timestamp);
+        if (ts) dates.add(dateKey(ts));
       }
       continue;
     }
 
-    const topLevelTs = parseTimestamp(session.timestamp ?? session.createTime ?? session.startTime ?? session.data?.createTime);
-    if (topLevelTs) dates.add(toDateKey(topLevelTs));
+    const topLevelTs = parseTs(session.timestamp ?? session.createTime ?? session.startTime ?? session.data?.createTime);
+    if (topLevelTs) dates.add(dateKey(topLevelTs));
 
     const messages = [
       ...(session.messages ?? []),
@@ -265,9 +274,9 @@ async function discoverGeminiDates(dates: Set<string>): Promise<void> {
       ...(session.data?.history ?? []),
     ];
     for (const msg of messages) {
-      const ts = parseTimestamp(msg.timestamp ?? msg.createTime);
+      const ts = parseTs(msg.timestamp ?? msg.createTime);
       if (ts) {
-        dates.add(toDateKey(ts));
+        dates.add(dateKey(ts));
       }
     }
   }
@@ -301,8 +310,8 @@ async function discoverCopilotVscodeDates(dates: Set<string>): Promise<void> {
     if (!content) continue;
     for (const line of content.split('\n')) {
       if (!line.includes('ccreq:') || !line.includes('| success |')) continue;
-      const ts = parseTimestamp(line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)/)?.[1]?.replace(' ', 'T'));
-      if (ts) dates.add(toDateKey(ts));
+      const ts = parseTs(line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)/)?.[1]?.replace(' ', 'T'));
+      if (ts) dates.add(dateKey(ts));
     }
   }
 
@@ -321,8 +330,8 @@ async function discoverCopilotVscodeDates(dates: Set<string>): Promise<void> {
     for (const request of session.requests ?? []) {
       if ((request.response?.length ?? 0) === 0) continue;
       if (request.result?.errorDetails?.responseIsIncomplete) continue;
-      const ts = parseTimestamp(request.timestamp);
-      if (ts) dates.add(toDateKey(ts));
+      const ts = parseTs(request.timestamp);
+      if (ts) dates.add(dateKey(ts));
     }
   }
 }
@@ -344,8 +353,8 @@ async function discoverAntigravityDates(dates: Set<string>): Promise<void> {
     } catch {
       continue;
     }
-    const ts = parseTimestamp(data.updatedAt);
-    if (ts) dates.add(toDateKey(ts));
+    const ts = parseTs(data.updatedAt);
+    if (ts) dates.add(dateKey(ts));
   }
 
   for (const filePath of browserFiles) {
@@ -358,8 +367,8 @@ async function discoverAntigravityDates(dates: Set<string>): Promise<void> {
     } catch {
       continue;
     }
-    const ts = parseTimestamp(data.highlights?.[0]?.start_time ?? data.highlights?.[0]?.end_time);
-    if (ts) dates.add(toDateKey(ts));
+    const ts = parseTs(data.highlights?.[0]?.start_time ?? data.highlights?.[0]?.end_time);
+    if (ts) dates.add(dateKey(ts));
   }
 }
 
@@ -398,8 +407,8 @@ async function discoverClaudeDates(dates: Set<string>): Promise<void> {
           } catch {
             continue;
           }
-          const ts = parseTimestamp(record.timestamp);
-          if (ts) dates.add(toDateKey(ts));
+          const ts = parseTs(record.timestamp);
+          if (ts) dates.add(dateKey(ts));
         }
       }
     }
@@ -423,8 +432,8 @@ async function discoverCodexDates(dates: Set<string>): Promise<void> {
         continue;
       }
       if (record.type !== 'event_msg' || record.payload?.type !== 'token_count') continue;
-      const ts = parseTimestamp(record.timestamp);
-      if (ts) dates.add(toDateKey(ts));
+      const ts = parseTs(record.timestamp);
+      if (ts) dates.add(dateKey(ts));
     }
   }
 }
@@ -483,22 +492,9 @@ async function safeReadUtf8(filePath: string): Promise<string | null> {
   }
 }
 
-function parseTimestamp(value?: string | number): Date | null {
-  if (value === undefined || value === null || value === '') return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 function getTodayLocalDate(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function toDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function getOrCreate(map: Map<string, Totals>, key: string): Totals {
@@ -547,8 +543,12 @@ function mergeTotals(target: Totals, source: Totals): Totals {
   return target;
 }
 
-function toBreakdownTotals(breakdown: IngestBreakdown, warnings: Set<string>): Totals {
-  const estimatedCostUsd = calculateBreakdownCost(breakdown, warnings);
+function toBreakdownTotals(
+  breakdown: IngestBreakdown,
+  warnings: Set<string>,
+  pricingCatalog?: PricingCatalog,
+): Totals {
+  const estimatedCostUsd = calculateBreakdownCost(breakdown, warnings, pricingCatalog);
   return {
     eventCount: breakdown.eventCount,
     inputTokens: breakdown.inputTokens,
@@ -573,8 +573,15 @@ function toBreakdownTotals(breakdown: IngestBreakdown, warnings: Set<string>): T
  *
  * 失败/估算情况注入 warning 给上层报告展示。
  */
-export function calculateBreakdownCost(breakdown: IngestBreakdown, warnings: Set<string>): number {
-  if (breakdown.costUSD != null && breakdown.costUSD > 0) {
+export function calculateBreakdownCost(
+  breakdown: IngestBreakdown,
+  warnings: Set<string>,
+  pricingCatalog?: PricingCatalog,
+): number {
+  const effectivePricingVersion = pricingCatalog?.version ?? PRICING_VERSION;
+  const sourceCostMatchesCatalog =
+    breakdown.pricingVersion == null || breakdown.pricingVersion === effectivePricingVersion;
+  if (breakdown.costUSD != null && breakdown.costUSD > 0 && sourceCostMatchesCatalog) {
     return breakdown.costUSD;
   }
 
@@ -590,12 +597,18 @@ export function calculateBreakdownCost(breakdown: IngestBreakdown, warnings: Set
       cacheWrite1hTokens: breakdown.cacheWrite1hTokens,
       outputTokens: breakdown.outputTokens,
     },
+    {
+      ...(pricingCatalog ? { catalog: pricingCatalog } : {}),
+      requestCount: breakdown.eventCount,
+    },
   );
 
   if (result.costStatus === 'unavailable') {
     warnings.add(`${breakdown.provider}/${breakdown.product}/${breakdown.model} 暂无定价配置，已跳过成本估算。`);
   } else if (result.costStatus === 'estimated' && result.resolvedModel && result.resolvedModel !== breakdown.model) {
     warnings.add(`${breakdown.model} 已按 ${result.resolvedModel} 的公开单价估算。`);
+  } else if (result.costStatus === 'estimated' && result.matchedTierIndex !== undefined) {
+    warnings.add(`${breakdown.model} 的阶梯价格已按每事件平均输入量估算。`);
   }
 
   return result.estimatedCostUsd;
