@@ -30,6 +30,17 @@ export interface ResolvedPricingCatalog {
   info: PricingInfo;
 }
 
+export function shouldPreferBundledCatalog(
+  candidateVersion: string,
+  bundledVersion: string,
+  mode: 'auto' | 'manual' | 'offline',
+): boolean {
+  if (mode === 'manual') return false;
+  const candidateDate = candidateVersion.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  const bundledDate = bundledVersion.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  return Boolean(candidateDate && bundledDate && candidateDate < bundledDate);
+}
+
 interface PricingCacheFile {
   fetchedAt: string;
   sourceUrl: string;
@@ -53,7 +64,7 @@ export async function resolvePricingCatalog(
   const ttlHours = config.pricing?.cacheTtlHours ?? DEFAULT_CACHE_TTL_HOURS;
 
   if (!options.forceRefresh && cache && (mode === 'manual' || mode === 'offline' || isCacheFresh(cache, ttlHours))) {
-    return fromCache(cache);
+    return preferBundledIfNewer(fromCache(cache), mode);
   }
 
   if ((mode !== 'offline' || options.forceRefresh) && (mode === 'auto' || options.forceRefresh)) {
@@ -61,6 +72,7 @@ export async function resolvePricingCatalog(
     for (const url of candidates) {
       try {
         const catalog = await fetchPricingCatalog(url);
+        if (shouldPreferBundledCatalog(catalog.version, bundledCatalog.version, mode)) continue;
         const fetchedAt = new Date().toISOString();
         await writePricingCache({ fetchedAt, sourceUrl: url, catalog });
         return {
@@ -73,8 +85,19 @@ export async function resolvePricingCatalog(
     }
   }
 
-  if (cache) return fromCache(cache);
+  if (cache) return preferBundledIfNewer(fromCache(cache), mode);
 
+  return {
+    catalog: bundledCatalog,
+    info: { source: 'bundled', version: bundledCatalog.version },
+  };
+}
+
+function preferBundledIfNewer(
+  candidate: ResolvedPricingCatalog,
+  mode: 'auto' | 'manual' | 'offline',
+): ResolvedPricingCatalog {
+  if (!shouldPreferBundledCatalog(candidate.catalog.version, bundledCatalog.version, mode)) return candidate;
   return {
     catalog: bundledCatalog,
     info: { source: 'bundled', version: bundledCatalog.version },

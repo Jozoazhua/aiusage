@@ -2,7 +2,7 @@ import { readdir, open, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
-import type { IngestBreakdown } from '@aiusage/shared';
+import { calculateCost, type IngestBreakdown } from '@aiusage/shared';
 import { normalizeModelName, runWithConcurrency, type ProjectFields } from './utils.js';
 
 const FILE_CONCURRENCY = 16;
@@ -15,6 +15,12 @@ const MAX_LINE_BYTES = 64 * 1024 * 1024; // 64 MB
 // (cache tokens are NOT included). We distribute using the model's all-time
 // input/output ratio from modelUsage, and fall back to 70/30 if unavailable.
 const STATS_CACHE_DEFAULT_INPUT_RATIO = 0.7;
+
+function resolveClaudeModelSource(model: string): Pick<IngestBreakdown, 'provider' | 'product'> {
+  return model.startsWith('glm-')
+    ? { provider: 'zhipu', product: 'glm-chat' }
+    : { provider: 'anthropic', product: 'claude-code' };
+}
 
 interface StatsCache {
   dailyModelTokens?: Array<{ date: string; tokensByModel: Record<string, number> }>;
@@ -218,10 +224,10 @@ async function processJsonlFile(
 
       const usage = message.usage;
       let model = normalizeModelName(rawModel);
-      if (usage.speed === 'fast') model = `${model}-fast`;
+      const source = resolveClaudeModelSource(model);
+      if (usage.speed === 'fast' && source.provider === 'anthropic') model = `${model}-fast`;
       const recordFields = record.cwd ? resolveProject(record.cwd, projectAliases) : fallbackFields;
       const sessionId = record.sessionId ?? fallbackSessionId;
-      const costUSD = record.costUSD ?? 0;
 
       const cacheCreation = usage.cache_creation;
       let cache5m = cacheCreation?.ephemeral_5m_input_tokens ?? 0;
@@ -235,7 +241,23 @@ async function processJsonlFile(
       if (!grouped) continue;
 
       const cacheWriteTokens = cache5m + cache1h;
-      const key = `${model}|${recordFields.project}`;
+      const calculatedCost = source.provider === 'zhipu'
+        ? calculateCost(source.provider, source.product, model, {
+            inputTokens: usage.input_tokens ?? 0,
+            cachedInputTokens: usage.cache_read_input_tokens ?? 0,
+            cacheWriteTokens,
+            cacheWrite5mTokens: cache5m,
+            cacheWrite1hTokens: cache1h,
+            outputTokens: usage.output_tokens ?? 0,
+          })
+        : null;
+      const costUSD = calculatedCost?.costStatus === 'unavailable'
+        ? 0
+        : calculatedCost?.estimatedCostUsd ?? record.costUSD ?? 0;
+      const pricingVersion = calculatedCost?.costStatus === 'unavailable'
+        ? undefined
+        : calculatedCost?.pricingVersion;
+      const key = `${source.provider}|${source.product}|${model}|${recordFields.project}`;
 
       // Track distinct sessions per group
       const sessionSetKey = `${usageDate}|${key}`;
@@ -252,10 +274,10 @@ async function processJsonlFile(
         existing.cacheWrite1hTokens = (existing.cacheWrite1hTokens ?? 0) + cache1h;
         existing.outputTokens += usage.output_tokens ?? 0;
         existing.costUSD = (existing.costUSD ?? 0) + costUSD;
+        existing.pricingVersion = pricingVersion ?? existing.pricingVersion;
       } else {
         grouped.set(key, {
-          provider: 'anthropic',
-          product: 'claude-code',
+          ...source,
           channel: 'cli',
           model,
           project: recordFields.project,
@@ -270,6 +292,7 @@ async function processJsonlFile(
           outputTokens: usage.output_tokens ?? 0,
           reasoningOutputTokens: 0,
           costUSD,
+          pricingVersion,
         });
       }
     }
@@ -317,13 +340,14 @@ async function fillFromStatsCache(
     for (const [rawModel, totalTokens] of Object.entries(tokensByModel)) {
       if (!totalTokens) continue;
       const model = normalizeModelName(rawModel);
+      const source = resolveClaudeModelSource(model);
       const ratio = inputRatios[rawModel] ?? inputRatios[model] ?? STATS_CACHE_DEFAULT_INPUT_RATIO;
 
       const inputTokens = Math.round(totalTokens * ratio);
       const outputTokens = totalTokens - inputTokens;
 
       // stats-cache has no per-project breakdown
-      const key = `${model}|unknown`;
+      const key = `${source.provider}|${source.product}|${model}|unknown`;
       const existing = grouped.get(key);
       if (existing) {
         existing.eventCount += 1;
@@ -331,8 +355,7 @@ async function fillFromStatsCache(
         existing.outputTokens += outputTokens;
       } else {
         grouped.set(key, {
-          provider: 'anthropic',
-          product: 'claude-code',
+          ...source,
           channel: 'cli',
           model,
           project: 'unknown',

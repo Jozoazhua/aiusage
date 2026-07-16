@@ -90,10 +90,33 @@ describe('JSONL scanning', () => {
     expect(breakdowns).toHaveLength(1);
     const b = breakdowns[0];
     expect(b.model).toBe('claude-opus-4-5');
+    expect(b.provider).toBe('anthropic');
+    expect(b.product).toBe('claude-code');
     expect(b.inputTokens).toBe(1000);
     expect(b.outputTokens).toBe(200);
     expect(b.cachedInputTokens).toBe(5000);
     expect(b.cacheWriteTokens).toBe(3000);
+  });
+
+  it('maps GLM requests to Zhipu and calculates per-request cost', async () => {
+    const projectDir = join(tmpDir, 'projects', '-Users-test-project');
+    await writeJsonl(projectDir, 'glm-session.jsonl', [
+      claudeRecord({
+        timestamp: '2026-01-15T11:00:00.000Z',
+        requestId: 'req_glm_001',
+        model: 'glm-5.1',
+        inputTokens: 10_000,
+        outputTokens: 1_000,
+      }),
+    ]);
+
+    const result = await scanClaudeDates(['2026-01-15'], join(tmpDir, 'projects'));
+    const [b] = result.get('2026-01-15')!;
+    expect(b.provider).toBe('zhipu');
+    expect(b.product).toBe('glm-chat');
+    expect(b.model).toBe('glm-5.1');
+    expect(b.costUSD).toBe(0.0117);
+    expect(b.pricingVersion).toMatch(/^2026-07-16/);
   });
 
   it('deduplicates repeated records with the same messageId+requestId (first-seen wins)', async () => {
@@ -248,6 +271,23 @@ describe('stats-cache fallback', () => {
     const result = await scanClaudeDates(['2025-12-30'], join(tmpDir, 'projects'));
     const [b] = result.get('2025-12-30')!;
     expect(b.model).toBe('claude-sonnet-4-5'); // date suffix stripped
+  });
+
+  it('maps GLM stats-cache data to Zhipu', async () => {
+    await writeFile(
+      join(tmpDir, 'stats-cache.json'),
+      makeStatsCache({
+        dailyModelTokens: [
+          { date: '2025-12-31', tokensByModel: { 'glm-5.1': 40_000 } },
+        ],
+      }),
+    );
+
+    const result = await scanClaudeDates(['2025-12-31'], join(tmpDir, 'projects'));
+    const [b] = result.get('2025-12-31')!;
+    expect(b.provider).toBe('zhipu');
+    expect(b.product).toBe('glm-chat');
+    expect(b.model).toBe('glm-5.1');
   });
 });
 

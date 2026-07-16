@@ -113,6 +113,17 @@ describe('calculateCost: 基本计费', () => {
     expect(result.costStatus).toBe('exact');
   });
 
+  it('GLM-5.2 按智谱人民币目录折算为美元', () => {
+    const result = calculateCost('zhipu', 'glm-chat', 'glm-5.2', {
+      inputTokens: 1_000_000,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 1_000_000,
+    });
+    expect(result.estimatedCostUsd).toBe(5);
+    expect(result.costStatus).toBe('exact');
+  });
+
   it('Codex gpt-5.4 基本 input/output 计费', () => {
     // gpt-5.4 long context: input=$5/M, output=$22.5/M
     const result = calculateCost('openai', 'codex', 'gpt-5.4', {

@@ -24,6 +24,7 @@ describe('catalog 结构', () => {
       ['cursor', 'cursor'],
       ['droid', 'droid'],
       ['opencode', 'opencode'],
+      ['zhipu', 'glm-chat'],
     ];
     const missing = required.filter(([p, pr]) => !catalog.providers[p]?.[pr]);
     expect(missing).toEqual([]);
@@ -52,6 +53,7 @@ describe('calculateCost — 关键模型', () => {
     ['openai', 'codex', 'o3-deep-research', 25], // 5 + 20，修正后
     ['openai', 'codex', 'computer-use-preview', 7.5], // 1.5 + 6，修正后
     ['google', 'gemini-cli', 'gemini-2.5-flash', 2.8], // 0.30 + 2.50，修正后
+    ['zhipu', 'glm-chat', 'glm-5.2', 5], // (8 + 28) CNY / 7.2
   ])('%s/%s/%s 应等于 $%s', (provider, product, model, expected) => {
     const r = calculateCost(provider, product, model, tokens);
     expect(r.costStatus).toBe('exact');

@@ -1,8 +1,17 @@
-import type { IngestActivityItem, IngestPayload, CostStatus } from '@aiusage/shared';
+import type { IngestActivityItem, IngestBreakdown, IngestPayload, CostStatus } from '@aiusage/shared';
 import { jsonOk, jsonError } from '../utils/response.js';
 import { verifyDeviceToken } from '../utils/token.js';
 import { calculateIngestBreakdownCost, getWorstCostStatus } from '../utils/pricing.js';
 import type { Env } from '../types.js';
+
+export function getLegacyClaudeGlmModels(
+  breakdown: Pick<IngestBreakdown, 'provider' | 'product' | 'model'>,
+): string[] {
+  if (breakdown.provider !== 'zhipu' || breakdown.product !== 'glm-chat' || !breakdown.model.startsWith('glm-')) {
+    return [];
+  }
+  return [breakdown.model, `${breakdown.model}-fast`];
+}
 
 export async function handleIngest(request: Request, env: Env): Promise<Response> {
   // 校验 DEVICE_TOKEN
@@ -122,6 +131,19 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
       const isFullPath = rawProject.startsWith('/') || /^[A-Z]:\\/i.test(rawProject);
       const projectDisplay = b.projectDisplay ?? (isFullPath ? rawProject.split('/').filter(Boolean).pop() || 'unknown' : rawProject);
       const projectAlias = b.projectAlias ?? null;
+
+      const legacyClaudeGlmModels = getLegacyClaudeGlmModels(b);
+      if (legacyClaudeGlmModels.length > 0) {
+        await env.DB.prepare(`
+          DELETE FROM daily_usage_breakdown
+          WHERE device_id = ? AND usage_date = ?
+            AND provider = 'anthropic' AND product = 'claude-code'
+            AND channel = ? AND project = ?
+            AND (model = ? OR model = ?)
+        `)
+          .bind(tokenPayload.deviceId, day.usageDate, b.channel, rawProject, ...legacyClaudeGlmModels)
+          .run();
+      }
 
       await env.DB.prepare(`
         INSERT INTO daily_usage_breakdown
