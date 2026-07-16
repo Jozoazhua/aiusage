@@ -208,7 +208,7 @@ export async function handleOverview(url: URL, env: Env): Promise<Response> {
   const costBearingEvents = Number(summary?.cost_bearing_events ?? 0);
   const totalCostUsd = roundUsd(summary?.total_cost_usd ?? 0);
 
-  const base = jsonOk({
+  return jsonOk({
     totalDays: activeDays,
     activeDays,
     totalEvents,
