@@ -16,11 +16,10 @@ const MAX_LINE_BYTES = 64 * 1024 * 1024; // 64 MB
 // input/output ratio from modelUsage, and fall back to 70/30 if unavailable.
 const STATS_CACHE_DEFAULT_INPUT_RATIO = 0.7;
 
-function resolveClaudeModelSource(model: string): Pick<IngestBreakdown, 'provider' | 'product'> {
-  return model.startsWith('glm-')
-    ? { provider: 'zhipu', product: 'glm-chat' }
-    : { provider: 'anthropic', product: 'claude-code' };
-}
+const CLAUDE_SOURCE: Pick<IngestBreakdown, 'provider' | 'product'> = {
+  provider: 'anthropic',
+  product: 'claude-code',
+};
 
 interface StatsCache {
   dailyModelTokens?: Array<{ date: string; tokensByModel: Record<string, number> }>;
@@ -224,8 +223,8 @@ async function processJsonlFile(
 
       const usage = message.usage;
       let model = normalizeModelName(rawModel);
-      const source = resolveClaudeModelSource(model);
-      if (usage.speed === 'fast' && source.provider === 'anthropic') model = `${model}-fast`;
+      const isGlm = model.startsWith('glm-');
+      if (usage.speed === 'fast' && !isGlm) model = `${model}-fast`;
       const recordFields = record.cwd ? resolveProject(record.cwd, projectAliases) : fallbackFields;
       const sessionId = record.sessionId ?? fallbackSessionId;
 
@@ -241,8 +240,8 @@ async function processJsonlFile(
       if (!grouped) continue;
 
       const cacheWriteTokens = cache5m + cache1h;
-      const calculatedCost = source.provider === 'zhipu'
-        ? calculateCost(source.provider, source.product, model, {
+      const calculatedCost = isGlm
+        ? calculateCost('zhipu', 'glm-chat', model, {
             inputTokens: usage.input_tokens ?? 0,
             cachedInputTokens: usage.cache_read_input_tokens ?? 0,
             cacheWriteTokens,
@@ -257,7 +256,7 @@ async function processJsonlFile(
       const pricingVersion = calculatedCost?.costStatus === 'unavailable'
         ? undefined
         : calculatedCost?.pricingVersion;
-      const key = `${source.provider}|${source.product}|${model}|${recordFields.project}`;
+      const key = `${CLAUDE_SOURCE.provider}|${CLAUDE_SOURCE.product}|${model}|${recordFields.project}`;
 
       // Track distinct sessions per group
       const sessionSetKey = `${usageDate}|${key}`;
@@ -277,7 +276,7 @@ async function processJsonlFile(
         existing.pricingVersion = pricingVersion ?? existing.pricingVersion;
       } else {
         grouped.set(key, {
-          ...source,
+          ...CLAUDE_SOURCE,
           channel: 'cli',
           model,
           project: recordFields.project,
@@ -340,14 +339,13 @@ async function fillFromStatsCache(
     for (const [rawModel, totalTokens] of Object.entries(tokensByModel)) {
       if (!totalTokens) continue;
       const model = normalizeModelName(rawModel);
-      const source = resolveClaudeModelSource(model);
       const ratio = inputRatios[rawModel] ?? inputRatios[model] ?? STATS_CACHE_DEFAULT_INPUT_RATIO;
 
       const inputTokens = Math.round(totalTokens * ratio);
       const outputTokens = totalTokens - inputTokens;
 
       // stats-cache has no per-project breakdown
-      const key = `${source.provider}|${source.product}|${model}|unknown`;
+      const key = `${CLAUDE_SOURCE.provider}|${CLAUDE_SOURCE.product}|${model}|unknown`;
       const existing = grouped.get(key);
       if (existing) {
         existing.eventCount += 1;
@@ -355,7 +353,7 @@ async function fillFromStatsCache(
         existing.outputTokens += outputTokens;
       } else {
         grouped.set(key, {
-          ...source,
+          ...CLAUDE_SOURCE,
           channel: 'cli',
           model,
           project: 'unknown',

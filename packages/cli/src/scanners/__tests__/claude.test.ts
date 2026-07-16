@@ -98,7 +98,7 @@ describe('JSONL scanning', () => {
     expect(b.cacheWriteTokens).toBe(3000);
   });
 
-  it('maps GLM requests to Zhipu and calculates per-request cost', async () => {
+  it('keeps GLM requests attributed to Claude Code and uses Zhipu pricing', async () => {
     const projectDir = join(tmpDir, 'projects', '-Users-test-project');
     await writeJsonl(projectDir, 'glm-session.jsonl', [
       claudeRecord({
@@ -112,8 +112,8 @@ describe('JSONL scanning', () => {
 
     const result = await scanClaudeDates(['2026-01-15'], join(tmpDir, 'projects'));
     const [b] = result.get('2026-01-15')!;
-    expect(b.provider).toBe('zhipu');
-    expect(b.product).toBe('glm-chat');
+    expect(b.provider).toBe('anthropic');
+    expect(b.product).toBe('claude-code');
     expect(b.model).toBe('glm-5.1');
     expect(b.costUSD).toBe(0.0117);
     expect(b.pricingVersion).toMatch(/^2026-07-16/);
@@ -273,7 +273,7 @@ describe('stats-cache fallback', () => {
     expect(b.model).toBe('claude-sonnet-4-5'); // date suffix stripped
   });
 
-  it('maps GLM stats-cache data to Zhipu', async () => {
+  it('keeps GLM stats-cache data attributed to Claude Code', async () => {
     await writeFile(
       join(tmpDir, 'stats-cache.json'),
       makeStatsCache({
@@ -285,8 +285,8 @@ describe('stats-cache fallback', () => {
 
     const result = await scanClaudeDates(['2025-12-31'], join(tmpDir, 'projects'));
     const [b] = result.get('2025-12-31')!;
-    expect(b.provider).toBe('zhipu');
-    expect(b.product).toBe('glm-chat');
+    expect(b.provider).toBe('anthropic');
+    expect(b.product).toBe('claude-code');
     expect(b.model).toBe('glm-5.1');
   });
 });

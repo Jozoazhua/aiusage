@@ -24,6 +24,25 @@ describe('getPricingCatalog', () => {
 // ─── calculateCost: 基本计费 ───
 
 describe('calculateCost: 基本计费', () => {
+  it('Claude Code GLM 保持工具归属但使用智谱定价', () => {
+    const result = calculateIngestBreakdownCost({
+      provider: 'anthropic',
+      product: 'claude-code',
+      channel: 'cli',
+      model: 'glm-5.2',
+      project: '/tmp/project',
+      eventCount: 1,
+      inputTokens: 1_000_000,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 1_000_000,
+      reasoningOutputTokens: 0,
+    });
+
+    expect(result.estimatedCostUsd).toBe(5);
+    expect(result.costStatus).toBe('exact');
+  });
+
   it('优先采用 scanner 按请求累计的精确成本', () => {
     const result = calculateIngestBreakdownCost({
       provider: 'openai',

@@ -6,9 +6,14 @@ import { calculateCost as calculateSharedCost } from '@aiusage/shared';
 import type { CostCalcResult, IngestBreakdown } from '@aiusage/shared';
 
 export function calculateIngestBreakdownCost(breakdown: IngestBreakdown): CostCalcResult {
+  const pricingSource = breakdown.provider === 'anthropic'
+    && breakdown.product === 'claude-code'
+    && breakdown.model.startsWith('glm-')
+    ? { provider: 'zhipu' as const, product: 'glm-chat' as const }
+    : { provider: breakdown.provider, product: breakdown.product };
   const calculated = calculateSharedCost(
-    breakdown.provider,
-    breakdown.product,
+    pricingSource.provider,
+    pricingSource.product,
     breakdown.model,
     {
       inputTokens: breakdown.inputTokens,

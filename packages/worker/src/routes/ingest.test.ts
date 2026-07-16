@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { getLegacyClaudeGlmModels } from './ingest.js';
+import { getLegacyZhipuGlmModels } from './ingest.js';
 
-describe('getLegacyClaudeGlmModels', () => {
-  it('returns the legacy Claude model keys for a Zhipu GLM breakdown', () => {
-    expect(getLegacyClaudeGlmModels({
-      provider: 'zhipu',
-      product: 'glm-chat',
+describe('getLegacyZhipuGlmModels', () => {
+  it('returns the legacy Zhipu model keys for a Claude Code GLM breakdown', () => {
+    expect(getLegacyZhipuGlmModels({
+      provider: 'anthropic',
+      product: 'claude-code',
       model: 'glm-5.1',
     })).toEqual(['glm-5.1', 'glm-5.1-fast']);
   });
 
   it('does not clean native Claude or unrelated providers', () => {
-    expect(getLegacyClaudeGlmModels({
+    expect(getLegacyZhipuGlmModels({
       provider: 'anthropic',
       product: 'claude-code',
       model: 'claude-opus-4-8',
