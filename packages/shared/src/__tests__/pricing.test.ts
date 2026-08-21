@@ -42,8 +42,12 @@ describe('calculateCost — 关键模型', () => {
   };
 
   it.each([
+    ['anthropic', 'claude-code', 'claude-fable-5', 60], // 10 + 50
+    ['anthropic', 'claude-code', 'claude-mythos-5', 60], // 10 + 50
+    ['anthropic', 'claude-code', 'claude-opus-5', 30], // 5 + 25
     ['anthropic', 'claude-code', 'claude-opus-4-8', 30], // 5 + 25
     ['anthropic', 'claude-code', 'claude-opus-4-7', 30], // 5 + 25
+    ['anthropic', 'claude-code', 'claude-sonnet-5', 12], // 2 + 10（intro through 2026-08-31）
     ['anthropic', 'claude-code', 'claude-sonnet-4-6', 18],
     ['openai', 'codex', 'gpt-5.6-sol', 55], // 长上下文：10 + 45
     ['openai', 'codex', 'gpt-5.6-terra', 27.5], // 长上下文：5 + 22.5
@@ -53,7 +57,8 @@ describe('calculateCost — 关键模型', () => {
     ['openai', 'codex', 'o3-deep-research', 25], // 5 + 20，修正后
     ['openai', 'codex', 'computer-use-preview', 7.5], // 1.5 + 6，修正后
     ['google', 'gemini-cli', 'gemini-2.5-flash', 2.8], // 0.30 + 2.50，修正后
-    ['zhipu', 'glm-chat', 'glm-5.2', 5], // (8 + 28) CNY / 7.2
+    ['moonshot', 'kimi-code', 'k3', 120 / 7.2], // alias → kimi-k3，¥20 + ¥100
+    ['zhipu', 'glm-chat', 'glm-5.2', 5], // ¥8 + ¥28，按 7.2 CNY/USD 换算
   ])('%s/%s/%s 应等于 $%s', (provider, product, model, expected) => {
     const r = calculateCost(provider, product, model, tokens);
     expect(r.costStatus).toBe('exact');
@@ -70,6 +75,15 @@ describe('calculateCost — 关键模型', () => {
     const r = calculateCost('anthropic', 'claude-code', 'claude-opus-4-7-20260201', tokens);
     expect(r.resolvedModel).toBe('claude-opus-4-7');
     expect(r.costStatus).toBe('exact');
+  });
+
+  it('常见误写别名解析为 exact', () => {
+    const fable = calculateCost('anthropic', 'claude-code', 'claude-fibre-5', tokens);
+    const opus = calculateCost('anthropic', 'claude-code', 'claude-ops-5', tokens);
+    expect(fable.resolvedModel).toBe('claude-fable-5');
+    expect(fable.costStatus).toBe('exact');
+    expect(opus.resolvedModel).toBe('claude-opus-5');
+    expect(opus.costStatus).toBe('exact');
   });
 
   it('语义化未知后缀触发前缀回退（estimated）', () => {
@@ -134,10 +148,16 @@ describe('Fast 模式白名单', () => {
     outputTokens: 1_000_000,
   };
 
-  it('Opus 4.8-fast 应 ×6', () => {
+  it('Opus 5-fast 应 ×2', () => {
+    const fast = calculateCost('anthropic', 'claude-code', 'claude-opus-5-fast', tokens);
+    const normal = calculateCost('anthropic', 'claude-code', 'claude-opus-5', tokens);
+    expect(fast.estimatedCostUsd).toBeCloseTo(normal.estimatedCostUsd * 2, 3);
+  });
+
+  it('Opus 4.8-fast 应 ×2', () => {
     const fast = calculateCost('anthropic', 'claude-code', 'claude-opus-4-8-fast', tokens);
     const normal = calculateCost('anthropic', 'claude-code', 'claude-opus-4-8', tokens);
-    expect(fast.estimatedCostUsd).toBeCloseTo(normal.estimatedCostUsd * 6, 3);
+    expect(fast.estimatedCostUsd).toBeCloseTo(normal.estimatedCostUsd * 2, 3);
   });
 
   it('Opus 4.7-fast 应 ×6', () => {
@@ -146,10 +166,10 @@ describe('Fast 模式白名单', () => {
     expect(fast.estimatedCostUsd).toBeCloseTo(normal.estimatedCostUsd * 6, 3);
   });
 
-  it('Opus 4.6-fast 应 ×6', () => {
+  it('Opus 4.6-fast 现按标准价', () => {
     const fast = calculateCost('anthropic', 'claude-code', 'claude-opus-4-6-fast', tokens);
     const normal = calculateCost('anthropic', 'claude-code', 'claude-opus-4-6', tokens);
-    expect(fast.estimatedCostUsd).toBeCloseTo(normal.estimatedCostUsd * 6, 3);
+    expect(fast.estimatedCostUsd).toBe(normal.estimatedCostUsd);
   });
 
   it('Sonnet-fast 不应 ×6（官方不支持）', () => {
@@ -213,6 +233,19 @@ describe('多币种折算', () => {
     });
     // input ¥6.5 + output ¥27 = ¥33.5 → $4.6528
     expect(r.estimatedCostUsd).toBeCloseTo(33.5 / 7.2, 3);
+    expect(r.costStatus).toBe('exact');
+  });
+
+  it('Kimi Code 的 k3 别名应命中 Kimi K3，并区分缓存命中价格', () => {
+    const r = calculateCost('moonshot', 'kimi-code', 'k3', {
+      inputTokens: 1_000_000,
+      cachedInputTokens: 2_000_000,
+      cacheWriteTokens: 500_000,
+      outputTokens: 100_000,
+    });
+    // input ¥20 + cached ¥4 + cache miss/write ¥10 + output ¥10 = ¥44 → $6.1111
+    expect(r.resolvedModel).toBe('kimi-k3');
+    expect(r.estimatedCostUsd).toBeCloseTo(44 / 7.2, 4);
     expect(r.costStatus).toBe('exact');
   });
 

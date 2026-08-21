@@ -1,6 +1,6 @@
 {
   "name": "@aiusage/cli",
-  "version": "1.7.2-local.1",
+  "version": "1.7.10-local.1",
   "description": "Track and sync AI tool token usage across devices.",
   "license": "MIT",
   "private": false,
@@ -21,6 +21,7 @@
     "dist",
     "pricing-catalog.json",
     "README.md",
+    "THIRD_PARTY_NOTICES.md",
     "LICENSE"
   ],
   "bin": {
@@ -36,6 +37,9 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   },
   "scripts": {
     "build": "rm -rf dist && node build.mjs",

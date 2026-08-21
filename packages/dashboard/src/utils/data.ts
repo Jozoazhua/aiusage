@@ -14,11 +14,7 @@ export function currentMonthDates(): string[] {
   return result;
 }
 
-/**
- * Pad current month's daily trend and token composition with zero-filled entries
- * for dates that have no data (including future dates in the month).
- * Backend now filters to the month directly, so KPIs and shares are already correct.
- */
+/** Filter overview data to current month and pad remaining days with zeros. */
 export function padMonth(ov: OverviewPayload): OverviewPayload {
   const allDates = currentMonthDates();
 
@@ -31,24 +27,75 @@ export function padMonth(ov: OverviewPayload): OverviewPayload {
     outputTokens: 0, reasoningOutputTokens: 0, totalTokens: 0,
   });
 
+  const monthTrend = dailyTrend.filter((d) => d.estimatedCostUsd > 0);
+  const totalCostUsd = monthTrend.reduce((sum, d) => sum + Number(d.estimatedCostUsd || 0), 0);
+  const totalEvents = monthTrend.reduce((sum, d) => sum + Number(d.eventCount || 0), 0);
+  const activeDays = monthTrend.length;
+
+  // Scale share/sankey data by cost ratio (month vs full range)
+  const ratio = ov.totalCostUsd > 0 ? totalCostUsd / ov.totalCostUsd : 0;
+  const eventRatio = ov.totalEvents > 0 ? totalEvents / ov.totalEvents : 0;
+
+  function scaleShares<T extends { estimatedCostUsd: number; eventCount: number }>(items: T[]): T[] {
+    return items.map((it) => ({
+      ...it,
+      estimatedCostUsd: +(it.estimatedCostUsd * ratio).toFixed(4),
+      eventCount: Math.round(it.eventCount * eventRatio),
+    }));
+  }
+
+  const sankey = ov.sankey.nodes.length ? {
+    nodes: ov.sankey.nodes.map((n) => ({ ...n, totalTokens: Math.round(n.totalTokens * ratio) })),
+    links: ov.sankey.links.map((l) => ({ ...l, value: Math.round(l.value * ratio) })),
+  } : ov.sankey;
+
+  // Filter provider daily trend to current month
+  const monthDateSet = new Set(allDates);
+  const providerDailyTrend = (ov.providerDailyTrend ?? []).filter(
+    (item) => monthDateSet.has(item.usageDate),
+  );
+
   return {
     ...ov,
     totalDays: allDates.length,
+    activeDays,
+    totalEvents,
+    totalCostUsd,
+    averageDailyCostUsd: activeDays > 0 ? totalCostUsd / activeDays : 0,
     dailyTrend,
+    providerDailyTrend,
     tokenComposition,
+    modelCostShare: scaleShares(ov.modelCostShare),
+    channelCostShare: scaleShares(ov.channelCostShare),
+    sankey,
+    filters: {
+      ...ov.filters,
+      options: {
+        ...ov.filters.options,
+        providers: scaleShares(ov.filters.options.providers),
+      },
+    },
   };
 }
 
 export function buildQuery(f: FiltersState): string {
   const p = new URLSearchParams();
-  if (f.range === 'custom') {
-    if (f.dateFrom) p.set('dateFrom', f.dateFrom);
-    if (f.dateTo) p.set('dateTo', f.dateTo);
-  } else {
-    p.set('range', f.range || '30d');
+  const aliases: Record<string, string> = {
+    deviceIds: 'deviceId',
+    products: 'product',
+    models: 'model',
+    projects: 'project',
+  };
+
+  for (const [k, v] of Object.entries(f)) {
+    if (Array.isArray(v)) {
+      const key = aliases[k] ?? k;
+      v.filter(Boolean).forEach((item) => p.append(key, item));
+      continue;
+    }
+    if (!v) continue;
+    p.set(k, v);
   }
-  if (f.deviceId) p.set('deviceId', f.deviceId);
-  if (f.product) p.set('product', f.product);
   return p.toString();
 }
 

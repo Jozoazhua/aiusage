@@ -89,6 +89,9 @@ export function DateRangePicker({ range, dateFrom, dateTo, onChange, locale, t }
     { value: 'today', label: t.rangeToday },
     { value: '7d',    label: t.range7d },
     { value: '30d',   label: t.range30d },
+    { value: '90d',   label: t.range90d },
+    { value: '180d',  label: t.range180d },
+    { value: 'month', label: t.thisMonth },
   ];
 
   const active   = 'bg-[var(--ai-surface)] text-[var(--ai-text)] shadow-sm';
