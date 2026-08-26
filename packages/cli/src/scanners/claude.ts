@@ -221,7 +221,8 @@ async function processJsonlFile(
       const usage = message.usage;
       let model = normalizeModelName(rawModel);
       const isGlm = model.startsWith('glm-');
-      if (usage.speed === 'fast' && !isGlm) model = `${model}-fast`;
+      const isDeepSeek = model.startsWith('deepseek-');
+      if (usage.speed === 'fast' && !isGlm && !isDeepSeek) model = `${model}-fast`;
       const recordFields = record.cwd ? resolveProject(record.cwd, projectAliases) : fallbackFields;
       const sessionId = record.sessionId ?? fallbackSessionId;
 
@@ -238,8 +239,13 @@ async function processJsonlFile(
 
       const cacheWriteTokens = clampToken(usage.cache_creation_input_tokens)
         || clampToken(cache5m) + clampToken(cache1h);
-      const calculatedCost = isGlm
-        ? calculateCost('zhipu', 'glm-chat', model, {
+      const pricingSource = isGlm
+        ? { provider: 'zhipu', product: 'glm-chat' }
+        : isDeepSeek
+          ? { provider: 'deepseek', product: 'deepseek-chat' }
+          : null;
+      const calculatedCost = pricingSource
+        ? calculateCost(pricingSource.provider, pricingSource.product, model, {
             inputTokens: clampToken(usage.input_tokens),
             cachedInputTokens: clampToken(usage.cache_read_input_tokens),
             cacheWriteTokens,

@@ -10,7 +10,7 @@ import { github } from './data/github.js';
 import { sourcegraph } from './data/sourcegraph.js';
 import { inflection, cursor, droid, opencode } from './data/placeholders.js';
 
-export const PRICING_VERSION = '2026-08-21-claude-5-glm-5.2-v1';
+export const PRICING_VERSION = '2026-08-26-deepseek-v4-peak-pricing-v1';
 
 /**
  * 模型别名（精确匹配优先于前缀回退）。

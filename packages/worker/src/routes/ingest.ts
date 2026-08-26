@@ -13,6 +13,15 @@ export function getLegacyZhipuGlmModels(
   return [breakdown.model, `${breakdown.model}-fast`];
 }
 
+export function getLegacyDeepSeekModels(
+  breakdown: Pick<IngestBreakdown, 'provider' | 'product' | 'model'>,
+): string[] {
+  if (breakdown.provider !== 'anthropic' || breakdown.product !== 'claude-code' || !breakdown.model.startsWith('deepseek-')) {
+    return [];
+  }
+  return [breakdown.model, `${breakdown.model}-fast`];
+}
+
 export async function handleIngest(request: Request, env: Env): Promise<Response> {
   // 校验 DEVICE_TOKEN
   const auth = request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -153,6 +162,19 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
             AND (model = ? OR model = ?)
         `)
           .bind(tokenPayload.deviceId, day.usageDate, b.channel, rawProject, ...legacyZhipuGlmModels)
+          .run();
+      }
+
+      const legacyDeepSeekModels = getLegacyDeepSeekModels(b);
+      if (legacyDeepSeekModels.length > 0) {
+        await env.DB.prepare(`
+          DELETE FROM daily_usage_breakdown
+          WHERE device_id = ? AND usage_date = ?
+            AND provider = 'deepseek' AND product = 'deepseek-chat'
+            AND channel = ? AND project = ?
+            AND (model = ? OR model = ?)
+        `)
+          .bind(tokenPayload.deviceId, day.usageDate, b.channel, rawProject, ...legacyDeepSeekModels)
           .run();
       }
 

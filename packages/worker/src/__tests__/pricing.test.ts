@@ -43,6 +43,28 @@ describe('calculateCost: 基本计费', () => {
     expect(result.costStatus).toBe('exact');
   });
 
+  it.each(['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp'])(
+    'Claude Code %s 保持工具归属但使用 DeepSeek 高峰定价',
+    (model) => {
+      const result = calculateIngestBreakdownCost({
+        provider: 'anthropic',
+        product: 'claude-code',
+        channel: 'cli',
+        model,
+        project: '/tmp/project',
+        eventCount: 1,
+        inputTokens: 1_000_000,
+        cachedInputTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens: 1_000_000,
+        reasoningOutputTokens: 0,
+      });
+
+      expect(result.estimatedCostUsd).toBeCloseTo(12 / 7.2, 4);
+      expect(result.costStatus).toBe('exact');
+    },
+  );
+
   it('优先采用 scanner 按请求累计的精确成本', () => {
     const result = calculateIngestBreakdownCost({
       provider: 'openai',

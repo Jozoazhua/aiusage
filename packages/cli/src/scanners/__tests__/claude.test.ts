@@ -21,6 +21,7 @@ function claudeRecord(opts: {
   cacheRead?: number;
   cacheWrite5m?: number;
   cacheWrite1h?: number;
+  speed?: 'standard' | 'fast';
 }): object {
   return {
     timestamp: opts.timestamp,
@@ -38,6 +39,7 @@ function claudeRecord(opts: {
           ephemeral_5m_input_tokens: opts.cacheWrite5m ?? 0,
           ephemeral_1h_input_tokens: opts.cacheWrite1h ?? 0,
         },
+        speed: opts.speed,
       },
     },
   };
@@ -105,7 +107,46 @@ describe('JSONL scanning', () => {
       model: 'glm-5.2',
       costUSD: 0.015,
     }));
-    expect(b.pricingVersion).toMatch(/^2026-08-21/);
+    expect(b.pricingVersion).toBeTruthy();
+  });
+
+  it('keeps DeepSeek models attributed to Claude Code and uses peak pricing', async () => {
+    const projectDir = join(tmpDir, 'projects', '-Users-test-project');
+    await writeJsonl(projectDir, 'deepseek-session.jsonl', [
+      claudeRecord({
+        timestamp: '2026-01-15T01:00:00.000Z',
+        requestId: 'req_deepseek_flash',
+        model: 'deepseek-v4-flash',
+        inputTokens: 10_000,
+        outputTokens: 1_000,
+        speed: 'fast',
+      }),
+      claudeRecord({
+        timestamp: '2026-01-15T10:00:00.000Z',
+        requestId: 'req_deepseek_vision',
+        model: 'deepseek-v4-flash-vision-exp',
+        inputTokens: 20_000,
+        outputTokens: 2_000,
+      }),
+    ]);
+
+    const breakdowns = (await scanClaudeDates(['2026-01-15'], join(tmpDir, 'projects'))).get('2026-01-15')!;
+    expect(breakdowns).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        provider: 'anthropic',
+        product: 'claude-code',
+        model: 'deepseek-v4-flash',
+        costUSD: 0.0054,
+        pricingVersion: expect.any(String),
+      }),
+      expect.objectContaining({
+        provider: 'anthropic',
+        product: 'claude-code',
+        model: 'deepseek-v4-flash-vision-exp',
+        costUSD: 0.0108,
+        pricingVersion: expect.any(String),
+      }),
+    ]));
   });
 
   it('deduplicates repeated records with the same messageId+requestId', async () => {

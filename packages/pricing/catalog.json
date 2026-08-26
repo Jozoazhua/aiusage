@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-21-claude-5-glm-5.2-v1",
+  "version": "2026-08-26-deepseek-v4-peak-pricing-v1",
   "fx": {
     "CNY": 7.2
   },
@@ -1045,31 +1045,35 @@
         "models": {
           "deepseek-v4-flash": {
             "currency": "USD",
-            "input_per_million": 0.14,
-            "cached_input_per_million": 0.0028,
-            "output_per_million": 0.28
+            "input_per_million": 0.4166666667,
+            "cached_input_per_million": 0.0138888889,
+            "output_per_million": 1.25
           },
           "deepseek-v4-pro": {
             "currency": "USD",
-            "notes": "75% off promo until 2026-05-31",
-            "input_per_million": 0.435,
-            "cached_input_per_million": 0.003625,
-            "output_per_million": 0.87,
-            "effective_to": "2026-05-31"
+            "input_per_million": 1.25,
+            "cached_input_per_million": 0.0416666667,
+            "output_per_million": 3.75
+          },
+          "deepseek-v4-flash-vision-exp": {
+            "currency": "USD",
+            "input_per_million": 0.4166666667,
+            "cached_input_per_million": 0.0138888889,
+            "output_per_million": 1.25
           },
           "deepseek-chat": {
             "currency": "USD",
             "notes": "alias for v4-flash non-thinking",
-            "input_per_million": 0.14,
-            "cached_input_per_million": 0.0028,
-            "output_per_million": 0.28
+            "input_per_million": 0.4166666667,
+            "cached_input_per_million": 0.0138888889,
+            "output_per_million": 1.25
           },
           "deepseek-reasoner": {
             "currency": "USD",
             "notes": "alias for v4-flash thinking",
-            "input_per_million": 0.14,
-            "cached_input_per_million": 0.0028,
-            "output_per_million": 0.28
+            "input_per_million": 0.4166666667,
+            "cached_input_per_million": 0.0138888889,
+            "output_per_million": 1.25
           }
         }
       }

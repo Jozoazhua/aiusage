@@ -249,16 +249,20 @@ describe('多币种折算', () => {
     expect(r.costStatus).toBe('exact');
   });
 
-  it('DeepSeek v4-flash 已是 USD，不折算', () => {
-    const r = calculateCost('deepseek', 'deepseek-chat', 'deepseek-v4-flash', {
-      inputTokens: 1_000_000,
-      cachedInputTokens: 0,
-      cacheWriteTokens: 0,
-      outputTokens: 1_000_000,
-    });
-    // 0.14 + 0.28 = 0.42
-    expect(r.estimatedCostUsd).toBeCloseTo(0.42, 4);
-  });
+  it.each(['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp'])(
+    '%s 按 DeepSeek 官方高峰价折算为美元',
+    (model) => {
+      const r = calculateCost('deepseek', 'deepseek-chat', model, {
+        inputTokens: 1_000_000,
+        cachedInputTokens: 1_000_000,
+        cacheWriteTokens: 0,
+        outputTokens: 1_000_000,
+      });
+      // 官方高峰价 ¥12.1，按 7.2 CNY/USD 折算
+      expect(r.estimatedCostUsd).toBeCloseTo(12.1 / 7.2, 4);
+      expect(r.costStatus).toBe('exact');
+    },
+  );
 });
 
 // ─── 阶梯定价 ───
