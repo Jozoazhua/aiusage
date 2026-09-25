@@ -12,18 +12,23 @@ import { catalog as defaultCatalog } from './catalog.js';
  * Fast 模式按 Anthropic 官方公布的独立价格折算。
  * Opus 4.7 曾经是 6x，现已不可用；保留倍率只为历史日志重算。
  * Opus 4.6 fast 已按标准价计费，因此不再放大。
+ * xAI Grok 4.7 Fast 为标准价 2x（长上下文档官方为 1.5x，此处按 2x 保守估算）。
  * OpenAI Codex 的 fast/priority 倍率另按官方 Codex speed/API priority 口径处理。
  */
-const ANTHROPIC_FAST_MULTIPLIERS: Record<string, number> = {
+const FAST_MULTIPLIERS: Record<string, number> = {
+  'claude-opus-5-5': 2,
   'claude-opus-5': 2,
   'claude-opus-4-8': 2,
   'claude-opus-4-7': 6,
+  'grok-4.7': 2,
 };
 
 type ServiceTierSuffix = 'fast' | 'priority' | null;
 
 const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
   'gpt-6-astra': 2,
+  'gpt-6-sol': 2,
+  'gpt-6-luna': 2,
   'gpt-5.6-sol': 2,
   'gpt-5.6-terra': 2,
   'gpt-5.6-luna': 2,
@@ -55,7 +60,7 @@ function getServiceTierMultiplier(
   }
 
   if (tier === 'fast') {
-    return ANTHROPIC_FAST_MULTIPLIERS[resolvedModel] ?? 1;
+    return FAST_MULTIPLIERS[resolvedModel] ?? 1;
   }
 
   return 1;

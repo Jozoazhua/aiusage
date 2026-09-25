@@ -24,6 +24,8 @@ describe('catalog 结构', () => {
       ['cursor', 'cursor'],
       ['droid', 'droid'],
       ['opencode', 'opencode'],
+      ['xai', 'opencode'],
+      ['xai', 'copilot-cli'],
     ];
     const missing = required.filter(([p, pr]) => !catalog.providers[p]?.[pr]);
     expect(missing).toEqual([]);
@@ -44,12 +46,17 @@ describe('calculateCost — 关键模型', () => {
     ['anthropic', 'claude-code', 'claude-fable-5-1', 60], // 10 + 50
     ['anthropic', 'claude-code', 'claude-fable-5', 60], // 10 + 50
     ['anthropic', 'claude-code', 'claude-mythos-5', 60], // 10 + 50
+    ['anthropic', 'claude-code', 'claude-opus-5-5', 24], // 4 + 20
+    ['anthropic', 'claude-code', 'claude-opus-5.5', 24], // alias → claude-opus-5-5
     ['anthropic', 'claude-code', 'claude-opus-5', 30], // 5 + 25
     ['anthropic', 'claude-code', 'claude-opus-4-8', 30], // 5 + 25
     ['anthropic', 'claude-code', 'claude-opus-4-7', 30], // 5 + 25
     ['anthropic', 'claude-code', 'claude-sonnet-5', 12], // 2 + 10（intro through 2026-08-31）
     ['anthropic', 'claude-code', 'claude-sonnet-4-6', 18],
     ['openai', 'codex', 'gpt-6-astra', 95], // 长上下文：20 + 75
+    ['openai', 'codex', 'gpt-6-sol', 19], // 长上下文：4 + 15
+    ['openai', 'codex', 'gpt-6-luna', 0.95], // 长上下文：0.2 + 0.75
+    ['xai', 'opencode', 'grok-4.7', 16], // 长上下文：4 + 12
     ['openai', 'codex', 'gpt-5.6-sol', 38], // 长上下文：8 + 30
     ['openai', 'codex', 'gpt-5.6-terra', 22], // 长上下文：4 + 18
     ['openai', 'codex', 'gpt-5.6-luna', 2.2], // 长上下文：0.4 + 1.8
@@ -62,6 +69,42 @@ describe('calculateCost — 关键模型', () => {
   ])('%s/%s/%s 应等于 $%s', (provider, product, model, expected) => {
     const r = calculateCost(provider, product, model, tokens);
     expect(r.costStatus).toBe('exact');
+    expect(r.estimatedCostUsd).toBeCloseTo(expected, 4);
+  });
+
+  it.each([
+    ['openai', 'codex', 'gpt-6-sol', 1.145], // 0.05M×2 + 0.1M×0.2 + 0.01M×2.5 + 0.1M×10
+    ['openai', 'codex', 'gpt-6-luna', 0.05725], // 0.05M×0.1 + 0.1M×0.01 + 0.01M×0.125 + 0.1M×0.5
+    ['xai', 'copilot-cli', 'grok-4.7', 0.77], // 0.05M×2 + 0.1M×0.5 + 0.01M×2（写缓存按输入价）+ 0.1M×6
+  ])('%s/%s/%s 短上下文含缓存为 $%s', (provider, product, model, expected) => {
+    const r = calculateCost(provider, product, model, {
+      inputTokens: 50_000, cachedInputTokens: 100_000, cacheWriteTokens: 10_000, outputTokens: 100_000,
+    });
+    expect(r.matchedTierIndex).toBe(0);
+    expect(r.estimatedCostUsd).toBeCloseTo(expected, 3);
+  });
+
+  it('Opus 5.5 缓存读写按专属费率计费', () => {
+    const r = calculateCost('anthropic', 'claude-code', 'claude-opus-5-5', {
+      inputTokens: 0,
+      cachedInputTokens: 1_000_000,
+      cacheWriteTokens: 1_000_000,
+      cacheWrite5mTokens: 1_000_000,
+      cacheWrite1hTokens: 1_000_000,
+      outputTokens: 0,
+    });
+    expect(r.estimatedCostUsd).toBeCloseTo(0.2 + 5 + 8, 4);
+  });
+
+  it.each([
+    ['anthropic', 'claude-code', 'claude-opus-5-5-fast', 48],
+    ['openai', 'codex', 'gpt-6-sol-fast', 24],
+    ['openai', 'codex', 'gpt-6-luna-priority', 1.2],
+    ['xai', 'opencode', 'grok-4.7-fast', 16],
+  ])('%s/%s/%s fast/priority 按 2x 计为 $%s', (provider, product, model, expected) => {
+    const r = calculateCost(provider, product, model, {
+      inputTokens: 1_000_000, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 1_000_000,
+    }, { requestCount: 10 });
     expect(r.estimatedCostUsd).toBeCloseTo(expected, 4);
   });
 
