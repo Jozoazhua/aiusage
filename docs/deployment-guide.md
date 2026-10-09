@@ -26,7 +26,7 @@ Device 03 ──sync──▶
 ### One-Click Setup
 
 ```bash
-git clone https://github.com/ennann/aiusage.git
+git clone https://github.com/Jozoazhua/aiusage.git
 cd aiusage
 pnpm install
 npx wrangler login
@@ -56,7 +56,7 @@ Save these values. The wizard also writes them to `.credentials` in the repo roo
 #### 1. Clone and install
 
 ```bash
-git clone https://github.com/ennann/aiusage.git
+git clone https://github.com/Jozoazhua/aiusage.git
 cd aiusage
 pnpm install
 ```
@@ -225,7 +225,7 @@ The controller automatically detects and scans all installed tools:
 
 | Tool | Provider | Usage Source |
 |------|----------|--------------|
-| Claude Code | Anthropic / compatible wrappers | `~/.config/claude/projects/`, `~/.claude/projects/` |
+| Claude Code | Anthropic / compatible wrappers | `~/.config/claude/projects/`, `~/.claude/projects/`, `CLAUDE_CONFIG_DIR`, `~/.claude-*`, Claude Desktop Cowork session roots |
 | Codex CLI | OpenAI | `~/.codex/sessions/`, `~/.codex/archived_sessions/` |
 | Cursor | Cursor | Local `state.vscdb` credential + Cursor usage CSV API |
 | Copilot CLI | GitHub | `~/.copilot/otel/`, `~/.copilot/session-state/` |

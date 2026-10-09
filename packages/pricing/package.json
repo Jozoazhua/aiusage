@@ -6,12 +6,12 @@
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ennann/aiusage.git",
+    "url": "git+https://github.com/Jozoazhua/aiusage.git",
     "directory": "packages/pricing"
   },
-  "homepage": "https://github.com/ennann/aiusage",
+  "homepage": "https://github.com/Jozoazhua/aiusage",
   "bugs": {
-    "url": "https://github.com/ennann/aiusage/issues"
+    "url": "https://github.com/Jozoazhua/aiusage/issues"
   },
   "type": "module",
   "publishConfig": {

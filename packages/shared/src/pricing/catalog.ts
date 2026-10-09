@@ -8,9 +8,10 @@ import { deepseek } from './data/deepseek.js';
 import { zhipu } from './data/zhipu.js';
 import { github } from './data/github.js';
 import { sourcegraph } from './data/sourcegraph.js';
+import { xai } from './data/xai.js';
 import { inflection, cursor, droid, opencode } from './data/placeholders.js';
 
-export const PRICING_VERSION = '2026-08-26-deepseek-v4-peak-pricing-v1';
+export const PRICING_VERSION = '2026-10-09-upstream-1.7.14-local-v1';
 
 /**
  * 模型别名（精确匹配优先于前缀回退）。
@@ -20,6 +21,7 @@ const aliases: Record<string, string> = {
   'claude-fibre-5': 'claude-fable-5',
   'claude-fiber-5': 'claude-fable-5',
   'claude-ops-5': 'claude-opus-5',
+  'claude-opus-5.5': 'claude-opus-5-5',
   'claude-opus-4-7-20260201': 'claude-opus-4-7',
   'claude-sonnet-4-6-20250301': 'claude-sonnet-4-6',
   'claude-opus-4-6-20250301': 'claude-opus-4-6',
@@ -48,6 +50,7 @@ export const catalog: PricingCatalog = {
     zhipu,
     github,
     sourcegraph,
+    xai,
     inflection,
     cursor,
     droid,

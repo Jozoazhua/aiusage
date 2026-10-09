@@ -1,17 +1,17 @@
 {
   "name": "@aiusage/cli",
-  "version": "1.7.10-local.2",
+  "version": "1.7.14-local.1",
   "description": "Track and sync AI tool token usage across devices.",
   "license": "MIT",
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ennann/aiusage.git",
+    "url": "git+https://github.com/Jozoazhua/aiusage.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/ennann/aiusage",
+  "homepage": "https://github.com/Jozoazhua/aiusage",
   "bugs": {
-    "url": "https://github.com/ennann/aiusage/issues"
+    "url": "https://github.com/Jozoazhua/aiusage/issues"
   },
   "type": "module",
   "publishConfig": {
