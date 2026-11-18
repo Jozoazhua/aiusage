@@ -530,3 +530,35 @@ describe('November 2026 pricing gaps', () => {
     })).toMatchObject({ costStatus: 'exact', estimatedCostUsd: 2.83, resolvedModel: 'gemini-3.5-flash-lite' });
   });
 });
+
+describe('GPT-6.2 pricing', () => {
+  it.each([
+    ['gpt-6.2-sol', 250_000, 1.5262, 0],
+    ['gpt-6.2-sol', 250_100, 2.5528, 1],
+    ['gpt-6.2-astra', 250_000, 6.1048, 0],
+    ['gpt-6.2-astra', 250_100, 10.2112, 1],
+    ['gpt-6.2-sol-fast', 250_100, 5.1056, 1],
+    ['gpt-6.2-astra-priority', 250_100, 20.4224, 1],
+  ])('prices %s at %i uncached input tokens', (model, inputTokens, estimatedCostUsd, matchedTierIndex) => {
+    expect(calculateCost('openai', 'codex', model, {
+      inputTokens, cachedInputTokens: 12_000, cacheWriteTokens: 10_000, outputTokens: 100_000,
+    })).toMatchObject({ estimatedCostUsd, matchedTierIndex, costStatus: 'exact' });
+  });
+
+  it.each([
+    ['gpt-6.2-sol-ultrafast', '2027-03-01T07:59:59Z', 3.63],
+    ['gpt-6.2-sol-ultrafast', '2027-03-01T08:00:00Z', 7.26],
+    ['gpt-6.2-astra-ultrafast', '2027-02-28', 14.52],
+    ['gpt-6.2-astra-ultrafast', '2027-03-01', 29.04],
+  ])('applies the Ultrafast rate for %s at %s', (model, usageTime, estimatedCostUsd) => {
+    expect(calculateCost('openai', 'codex', model, {
+      inputTokens: 100_000, cachedInputTokens: 100_000, cacheWriteTokens: 0, outputTokens: 100_000,
+    }, { usageTime })).toMatchObject({ estimatedCostUsd, costStatus: 'exact' });
+  });
+
+  it('uses the published standard rate for the distinct Astra for Law model', () => {
+    expect(calculateCost('openai', 'codex', 'gpt-6.2-astra-law', {
+      inputTokens: 100_000, cachedInputTokens: 100_000, cacheWriteTokens: 10_000, outputTokens: 100_000,
+    })).toMatchObject({ estimatedCostUsd: 4.94, resolvedModel: 'gpt-6.2-astra-law', costStatus: 'exact' });
+  });
+});

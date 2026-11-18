@@ -27,6 +27,8 @@ const FAST_MULTIPLIERS: Record<string, number> = {
 type ServiceTierSuffix = 'fast' | 'priority' | 'ultrafast' | null;
 
 const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
+  'gpt-6.2-astra': 2,
+  'gpt-6.2-sol': 2,
   'gpt-6.1-sol': 2,
   'gpt-6.1-terra': 2,
   'gpt-6-astra': 2,
@@ -40,7 +42,7 @@ const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
 };
 
 function splitServiceTierSuffix(model: string): { baseModel: string; tier: ServiceTierSuffix } {
-  if (model === 'gpt-6.1-sol-ultrafast') {
+  if (/^(?:gpt-6\.1-sol|gpt-6\.2-(?:astra|sol))-ultrafast$/.test(model)) {
     return { baseModel: model.replace(/-ultrafast$/, ''), tier: 'ultrafast' };
   }
   if (model.endsWith('-priority')) {
@@ -57,11 +59,17 @@ function getServiceTierMultiplier(
   product: string,
   resolvedModel: string,
   tier: ServiceTierSuffix,
+  usageTime?: string,
 ): number {
   if (!tier) return 1;
 
   if (provider === 'openai' && product === 'codex') {
     if (tier === 'ultrafast' && resolvedModel === 'gpt-6.1-sol') return 6;
+    if (tier === 'ultrafast' && (resolvedModel === 'gpt-6.2-astra' || resolvedModel === 'gpt-6.2-sol')) {
+      if (usageTime?.length === 10) return usageTime < '2027-03-01' ? 3 : 6;
+      const timestamp = usageTime ? Date.parse(usageTime) : Date.now();
+      return timestamp < Date.parse('2027-03-01T00:00:00-08:00') ? 3 : 6;
+    }
     if (tier === 'fast' && resolvedModel.startsWith('gpt-5.6-')) return 1;
     return OPENAI_CODEX_TIER_MULTIPLIERS[resolvedModel] ?? 1;
   }
@@ -139,6 +147,7 @@ export interface CalculateCostOptions {
   catalog?: PricingCatalog;
   /** 聚合 breakdown 包含的请求/事件数；用于按平均单请求 input 估算阶梯。 */
   requestCount?: number;
+  usageTime?: string;
 }
 
 export function calculateCost(
@@ -213,7 +222,7 @@ export function calculateCost(
   // 折算 currency → USD
   raw = toUsd(raw, pricing.currency, cat);
 
-  const finalCost = raw * getServiceTierMultiplier(provider, product, resolvedModel, tier);
+  const finalCost = raw * getServiceTierMultiplier(provider, product, resolvedModel, tier, options.usageTime);
 
   return {
     estimatedCostUsd: Math.round(finalCost * 10000) / 10000,

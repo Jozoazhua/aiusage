@@ -38,7 +38,12 @@ export function shouldPreferBundledCatalog(
   if (mode === 'manual') return false;
   const candidateDate = candidateVersion.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
   const bundledDate = bundledVersion.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
-  return Boolean(candidateDate && bundledDate && candidateDate < bundledDate);
+  if (!candidateDate || !bundledDate) return false;
+  if (candidateDate !== bundledDate) return candidateDate < bundledDate;
+  const candidateRevision = candidateVersion.match(/-local-v(\d+)$/)?.[1];
+  const bundledRevision = bundledVersion.match(/-local-v(\d+)$/)?.[1];
+  return candidateRevision !== undefined && bundledRevision !== undefined
+    && Number(candidateRevision) < Number(bundledRevision);
 }
 
 interface PricingCacheFile {

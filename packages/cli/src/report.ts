@@ -100,7 +100,7 @@ export async function buildLocalReport(
       daysWithData += 1;
 
       for (const breakdown of result.breakdowns) {
-        const breakdownTotals = toBreakdownTotals(breakdown, pricingWarnings, options.pricingCatalog);
+        const breakdownTotals = toBreakdownTotals(breakdown, pricingWarnings, options.pricingCatalog, usageDate);
         dayTotals.estimatedCostUsd += breakdownTotals.estimatedCostUsd;
         mergeTotals(totals, breakdownTotals);
         mergeTotals(getOrCreate(bySource, `${breakdown.provider}/${breakdown.product}`), breakdownTotals);
@@ -647,8 +647,9 @@ function toBreakdownTotals(
   breakdown: IngestBreakdown,
   warnings: Set<string>,
   pricingCatalog?: PricingCatalog,
+  usageDate?: string,
 ): Totals {
-  const estimatedCostUsd = calculateBreakdownCost(breakdown, warnings, pricingCatalog);
+  const estimatedCostUsd = calculateBreakdownCost(breakdown, warnings, pricingCatalog, usageDate);
   return {
     eventCount: breakdown.eventCount,
     inputTokens: breakdown.inputTokens,
@@ -678,6 +679,7 @@ export function calculateBreakdownCost(
   breakdown: IngestBreakdown,
   warnings: Set<string>,
   pricingCatalog?: PricingCatalog,
+  usageDate?: string,
 ): number {
   const effectivePricingVersion = pricingCatalog?.version ?? PRICING_VERSION;
   const sourceCostMatchesCatalog =
@@ -699,11 +701,12 @@ export function calculateBreakdownCost(
       cacheWriteTokens: breakdown.cacheWriteTokens,
       cacheWrite5mTokens: breakdown.cacheWrite5mTokens,
       cacheWrite1hTokens: breakdown.cacheWrite1hTokens,
-      outputTokens: breakdown.outputTokens,
+      outputTokens: breakdown.outputTokens + (breakdown.product === 'codex' ? (breakdown.reasoningOutputTokens ?? 0) : 0),
     },
     {
       ...(pricingCatalog ? { catalog: pricingCatalog } : {}),
       requestCount: breakdown.eventCount,
+      usageTime: usageDate,
     },
   );
 

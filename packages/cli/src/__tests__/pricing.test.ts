@@ -71,6 +71,13 @@ describe('resolvePricingCatalog', () => {
     expect(resolved.info.version).toBe(bundledCatalog.version);
   });
 
+  it('prefers the newer bundled local revision over a same-day local cache', async () => {
+    await writeCache('2026-11-18-upstream-1.8.3-local-v1');
+    const resolved = await resolvePricingCatalog({});
+    expect(resolved.info.source).toBe('bundled');
+    expect(resolved.info.version).toBe(bundledCatalog.version);
+  });
+
   it('auto 模式下缓存不旧于内置目录时沿用缓存', async () => {
     await writeCache('9999-12-31-new');
     const resolved = await resolvePricingCatalog({});

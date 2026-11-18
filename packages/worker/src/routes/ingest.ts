@@ -83,7 +83,7 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
     for (const b of day.breakdowns) {
       const cacheWrite5mTokens = b.cacheWrite5mTokens ?? b.cacheWriteTokens;
       const cacheWrite1hTokens = b.cacheWrite1hTokens ?? 0;
-      const cost = calculateIngestBreakdownCost(b);
+      const cost = calculateIngestBreakdownCost(b, day.usageDate);
 
       costStatuses.push(cost.costStatus);
       dayTotalCost += cost.estimatedCostUsd;

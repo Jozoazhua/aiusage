@@ -24,6 +24,16 @@ describe('getPricingCatalog', () => {
 // ─── calculateCost: 基本计费 ───
 
 describe('calculateCost: 基本计费', () => {
+  it('recalculates GPT-6.2 Ultrafast with the usage date and reasoning tokens', () => {
+    const result = calculateIngestBreakdownCost({
+      provider: 'openai', product: 'codex', channel: 'cli', model: 'gpt-6.2-sol-ultrafast',
+      project: 'test', eventCount: 1, inputTokens: 10_000, cachedInputTokens: 0, cacheWriteTokens: 0,
+      outputTokens: 200, reasoningOutputTokens: 300,
+    }, '2026-11-18');
+
+    expect(result).toMatchObject({ estimatedCostUsd: 0.075, costStatus: 'exact' });
+  });
+
   it('Claude Code GLM 保持工具归属但使用智谱定价', () => {
     const result = calculateIngestBreakdownCost({
       provider: 'anthropic',

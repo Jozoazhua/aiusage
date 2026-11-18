@@ -5,7 +5,7 @@
 import { calculateCost as calculateSharedCost } from '@aiusage/shared';
 import type { CostCalcResult, IngestBreakdown } from '@aiusage/shared';
 
-export function calculateIngestBreakdownCost(breakdown: IngestBreakdown): CostCalcResult {
+export function calculateIngestBreakdownCost(breakdown: IngestBreakdown, usageDate?: string): CostCalcResult {
   const isClaudeCode = breakdown.provider === 'anthropic' && breakdown.product === 'claude-code';
   const pricingSource = isClaudeCode && breakdown.model.startsWith('glm-')
     ? { provider: 'zhipu' as const, product: 'glm-chat' as const }
@@ -22,9 +22,9 @@ export function calculateIngestBreakdownCost(breakdown: IngestBreakdown): CostCa
       cacheWriteTokens: breakdown.cacheWriteTokens,
       cacheWrite5mTokens: breakdown.cacheWrite5mTokens ?? breakdown.cacheWriteTokens,
       cacheWrite1hTokens: breakdown.cacheWrite1hTokens ?? 0,
-      outputTokens: breakdown.outputTokens,
+      outputTokens: breakdown.outputTokens + (breakdown.product === 'codex' ? (breakdown.reasoningOutputTokens ?? 0) : 0),
     },
-    { requestCount: breakdown.eventCount },
+    { requestCount: breakdown.eventCount, usageTime: usageDate },
   );
 
   const hasVendorReportedCost = breakdown.product === 'trae-intl' || breakdown.product === 'opencode';

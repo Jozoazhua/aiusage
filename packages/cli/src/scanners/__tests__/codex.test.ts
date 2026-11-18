@@ -200,6 +200,21 @@ describe('Codex tiered pricing', () => {
 });
 
 describe('Codex service tier', () => {
+  it.each([
+    ['gpt-6.2-sol', 'fast', 0.0196],
+    ['gpt-6.2-astra', 'ultrafast', 0.1176],
+  ])('prices %s using the configured %s tier', async (model, tier, costUSD) => {
+    const day = '2026-11-18';
+    const tokens = { input: 10_000, cached: 8_000, output: 500, reasoning: 200 };
+    await writeFile(join(tmpDir, 'config.toml'), `service_tier = "${tier}"\n`);
+    await writeSession(join(tmpDir, 'sessions', '2026', '11', '18'), 'rollout-test.jsonl',
+      tokenCountEvent(`${day}T10:00:00.000Z`, tokens, tokens, model));
+
+    const [result] = await scanCodex(day, tmpDir);
+    expect(result).toMatchObject({ model: `${model}-${tier}`, outputTokens: 300, reasoningOutputTokens: 200,
+      costUSD, pricingVersion: PRICING_VERSION });
+  });
+
   it('adds fast suffix for GPT-6 Astra Codex usage', async () => {
     const day = '2026-09-05';
     await writeFile(join(tmpDir, 'config.toml'), 'service_tier = "fast"\n');

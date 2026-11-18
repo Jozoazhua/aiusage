@@ -8,7 +8,7 @@ import { fileModifiedTs, keepFilesModifiedSince, normalizeModelName, runWithConc
 
 const FILE_CONCURRENCY = 16;
 const MAX_LINE_BYTES = 64 * 1024 * 1024; // 64 MB
-type CodexServiceTier = 'fast' | 'priority' | null;
+type CodexServiceTier = 'fast' | 'priority' | 'ultrafast' | null;
 
 interface CodexRecord {
   type?: string;
@@ -283,7 +283,7 @@ async function processCodexFile(
         // Reasoning is billed at the output rate, so pricing still uses the
         // inclusive raw Codex output total.
         outputTokens: tokens.output,
-      });
+      }, { usageTime: ts.toISOString() });
       const exactEventCost = eventCost.costStatus === 'exact' ? eventCost.estimatedCostUsd : undefined;
       events.push({
         usageDate,
@@ -549,6 +549,7 @@ async function detectCodexServiceTier(baseDir: string): Promise<CodexServiceTier
   const serviceTier = config.match(/^\s*service_tier\s*=\s*["']([^"']+)["']/m)?.[1]?.trim().toLowerCase();
   if (serviceTier === 'priority') return 'priority';
   if (serviceTier === 'fast') return 'fast';
+  if (serviceTier === 'ultrafast') return 'ultrafast';
 
   const fastMode = config.match(/^\s*fast_mode\s*=\s*(true|false)\s*$/m)?.[1];
   return fastMode === 'true' ? 'fast' : null;
@@ -556,8 +557,12 @@ async function detectCodexServiceTier(baseDir: string): Promise<CodexServiceTier
 
 function applyCodexServiceTier(model: string, serviceTier: CodexServiceTier): string {
   if (!serviceTier) return model;
-  if (model.endsWith('-fast') || model.endsWith('-priority')) return model;
-  const supportsFast = model === 'gpt-6-astra' || model === 'gpt-6-sol' || model === 'gpt-6-luna'
+  if (model.endsWith('-fast') || model.endsWith('-priority') || model.endsWith('-ultrafast')) return model;
+  const isGpt62 = model === 'gpt-6.2-astra' || model === 'gpt-6.2-sol';
+  if (serviceTier === 'ultrafast') {
+    return isGpt62 || model === 'gpt-6.1-sol' ? `${model}-ultrafast` : model;
+  }
+  const supportsFast = isGpt62 || model === 'gpt-6-astra' || model === 'gpt-6-sol' || model === 'gpt-6-luna'
     || model === 'gpt-5.5' || model === 'gpt-5.4';
   const supportsPriority =
     model === 'gpt-5.6' ||
