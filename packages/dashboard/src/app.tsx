@@ -127,19 +127,18 @@ const THEME_LABELS: Record<ThemeMode, { en: string; zh: string }> = {
 
 function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: (v: ThemeMode) => void; locale: Locale }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="ai-control-group inline-flex items-center gap-0.5 rounded-lg p-0.5">
       {THEME_OPTIONS.map((o) => {
         const Icon = o.icon;
         return (
           <button
             key={o.value}
+            type="button"
             onClick={() => onChange(o.value)}
-            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
-              value === o.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-                : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
-            }`}
+            className="ai-control-segment inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
             aria-label={o.value}
+            aria-pressed={value === o.value}
+            title={THEME_LABELS[o.value][locale]}
           >
             <Icon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{THEME_LABELS[o.value][locale]}</span>
@@ -152,16 +151,14 @@ function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: 
 
 function LangToggle({ value, onChange }: { value: Locale; onChange: (v: Locale) => void }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="ai-control-group inline-flex items-center gap-0.5 rounded-lg p-0.5">
       {(['en', 'zh'] as const).map((l) => (
         <button
           key={l}
+          type="button"
           onClick={() => onChange(l)}
-          className={`rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
-            value === l
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
-          }`}
+          className="ai-control-segment min-w-7 rounded-md px-2 py-1 text-[11px] font-medium"
+          aria-pressed={value === l}
         >
           {l === 'en' ? 'EN' : '中'}
         </button>
@@ -257,38 +254,32 @@ function MultiSelectFilter({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="lg:relative">
       <button
         type="button"
         aria-expanded={open}
+        data-filtered={hasSelection}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-9 max-w-full items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:focus-visible:ring-white/20 ${
-          hasSelection
-            ? 'bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-[#222222] dark:text-slate-300 dark:ring-white/10'
-            : 'bg-slate-100/80 text-slate-400 hover:text-slate-600 dark:bg-[#1a1a1a]/80 dark:text-slate-500 dark:hover:text-slate-300'
-        }`}
+        className="ai-control-button inline-flex h-9 max-w-full items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium"
       >
         <FilterIcon icon={selectedIcon} />
         <span className="flex min-w-0 items-center gap-1.5 truncate">
           <span className="shrink-0">{label}</span>
-          <span className="min-w-0 truncate">{summary}</span>
+          <span className="min-w-0 truncate text-[var(--ai-text)]">{summary}</span>
         </span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.14)] dark:border-white/10 dark:bg-[#111111] dark:shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+        <div className="absolute left-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-2rem))] max-w-full overflow-hidden rounded-lg border border-[var(--ai-border)] bg-[var(--ai-surface)] shadow-xl lg:max-w-none">
           <div className="max-h-80 overflow-y-auto p-1.5">
             <button
               type="button"
+              aria-pressed={value.length === 0}
               onClick={() => onChange([])}
-              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:focus-visible:ring-white/20 ${
-                value.length === 0
-                  ? 'bg-slate-50 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-slate-200'
-              }`}
+              className="ai-control-segment flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px]"
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded border border-slate-200 text-slate-400 dark:border-white/15 dark:text-slate-500">
+              <span className="ai-filter-check flex size-4 shrink-0 items-center justify-center rounded border">
                 {value.length === 0 && <Check className="h-3 w-3" />}
               </span>
               <span className="font-medium">{allLabel}</span>
@@ -302,19 +293,12 @@ function MultiSelectFilter({
               <button
                 key={option.value}
                 type="button"
+                aria-pressed={checked}
                 title={tip}
                 onClick={() => toggleValue(option.value)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:focus-visible:ring-white/20 ${
-                  checked
-                    ? 'bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-slate-200'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-slate-200'
-                }`}
+                className="ai-control-segment flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px]"
               >
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                  checked
-                    ? 'border-slate-300 bg-slate-200 text-slate-600 dark:border-white/15 dark:bg-white/10 dark:text-slate-300'
-                    : 'border-slate-200 dark:border-white/15'
-                }`}>
+                <span className="ai-filter-check flex size-4 shrink-0 items-center justify-center rounded border">
                   {checked && <Check className="h-3 w-3" />}
                 </span>
                 {icon && (
@@ -323,7 +307,7 @@ function MultiSelectFilter({
                   </span>
                 )}
                 <span className="min-w-0 flex-1 truncate">{formatLabel(option.label, option.value)}</span>
-                <span className="shrink-0 tabular-nums text-slate-300 dark:text-slate-600">
+                <span className="shrink-0 tabular-nums text-[var(--ai-muted)]">
                   {formatCompact(option.eventCount ?? 0, locale)}
                 </span>
               </button>
@@ -560,9 +544,11 @@ export function App() {
             <ThemeToggle value={theme} onChange={setTheme} locale={locale} />
             <LangToggle value={locale} onChange={setLocale} />
             <button
+              type="button"
               onClick={refresh}
-              className="hidden sm:inline-flex items-center justify-center rounded-md bg-slate-100/80 p-1.5 text-slate-400 transition-colors hover:text-slate-600 dark:bg-[#1a1a1a]/80 dark:text-slate-500 dark:hover:text-slate-300"
-              aria-label="Refresh"
+              className="ai-control-button hidden size-7 items-center justify-center rounded-lg sm:inline-flex"
+              aria-label={t.refresh}
+              title={t.refresh}
             >
               <RotateCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -595,7 +581,7 @@ export function App() {
           </div>
 
           {overview && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="relative flex min-w-0 flex-wrap items-center gap-2 lg:static">
               <MultiSelectFilter
                 label={t.tool}
                 value={filters.products ?? []}

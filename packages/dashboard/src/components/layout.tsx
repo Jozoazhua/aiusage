@@ -46,19 +46,18 @@ const THEME_LABELS: Record<ThemeMode, { en: string; zh: string }> = {
 
 function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: (v: ThemeMode) => void; locale: Locale }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="ai-control-group inline-flex items-center gap-0.5 rounded-lg p-0.5">
       {THEME_OPTIONS.map((o) => {
         const Icon = o.icon;
         return (
           <button
             key={o.value}
+            type="button"
             onClick={() => onChange(o.value)}
-            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
-              value === o.value
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-                : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
-            }`}
+            className="ai-control-segment inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
             aria-label={o.value}
+            aria-pressed={value === o.value}
+            title={THEME_LABELS[o.value][locale]}
           >
             <Icon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{THEME_LABELS[o.value][locale]}</span>
@@ -71,16 +70,14 @@ function ThemeToggle({ value, onChange, locale }: { value: ThemeMode; onChange: 
 
 function LangToggle({ value, onChange }: { value: Locale; onChange: (v: Locale) => void }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-slate-100/80 p-0.5 dark:bg-[#1a1a1a]/80">
+    <div className="ai-control-group inline-flex items-center gap-0.5 rounded-lg p-0.5">
       {(['en', 'zh'] as const).map((l) => (
         <button
           key={l}
+          type="button"
           onClick={() => onChange(l)}
-          className={`rounded px-2 py-1 text-[11px] font-medium transition-all duration-150 ${
-            value === l
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-[#222222] dark:text-slate-300'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
-          }`}
+          className="ai-control-segment min-w-7 rounded-md px-2 py-1 text-[11px] font-medium"
+          aria-pressed={value === l}
         >
           {l === 'en' ? 'EN' : '中'}
         </button>
@@ -178,9 +175,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <ThemeToggle value={theme} onChange={setTheme} locale={locale} />
               <LangToggle value={locale} onChange={setLocale} />
               <button
+                type="button"
                 onClick={refresh}
-                className="hidden sm:inline-flex items-center justify-center rounded-md bg-slate-100/80 p-1.5 text-slate-400 transition-colors hover:text-slate-600 dark:bg-[#1a1a1a]/80 dark:text-slate-500 dark:hover:text-slate-300"
-                aria-label="Refresh"
+                className="ai-control-button hidden size-7 items-center justify-center rounded-lg sm:inline-flex"
+                aria-label={t.refresh}
+                title={t.refresh}
               >
                 <RotateCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
               </button>
