@@ -20,6 +20,7 @@ import { KpiCard, CostKpiCard } from './components/kpi-card';
 import { useFetchCnyRate, useCurrencyStore } from './hooks/use-cny-rate';
 import { CostTrendChart } from './components/cost-trend-chart';
 import { TokenTrendChart } from './components/token-trend-chart';
+import { PromptTrendChart } from './components/prompt-trend-chart';
 import { TokenCompositionChart } from './components/token-composition-chart';
 import { FlowChart } from './components/flow-chart';
 import { DonutSection } from './components/donut-section';
@@ -531,6 +532,9 @@ export function App() {
       cachedTokens: formatDeltaPercent(kpis?.cachedTokens, comparison.cachedInputTokens),
       activeDays: formatDeltaPercent(overview.activeDays, comparison.activeDays),
       totalEvents: formatDeltaPercent(overview.totalEvents, comparison.totalEvents),
+      userMessageChars: typeof overview.interactionMetrics?.userMessageChars === 'number'
+        ? formatDeltaPercent(overview.interactionMetrics.userMessageChars, comparison.userMessageChars)
+        : undefined,
       userMessages: formatDeltaPercent(userMessageCount, comparison.userMessageCount),
       avgDailyCost: formatDeltaPercent(overview.averageDailyCostUsd, comparison.averageDailyCostUsd),
       cacheHitRate: formatDeltaPercent(kpis?.cacheHitRate, comparison.cacheHitRate),
@@ -636,8 +640,8 @@ export function App() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
               <div key={`sb-${i}`} className="card px-5 py-5">
                 <Skeleton className="mb-3 h-2.5 w-14" />
                 <Skeleton className="h-6 w-20" />
@@ -683,10 +687,10 @@ export function App() {
 
           {/* ── KPI Row 2 ── */}
           <div
-            className="fade-up grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+            className="fade-up grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
             style={{ animationDelay: '100ms' }}
           >
-            <div className="card col-span-2 sm:col-span-1">
+            <div className="card">
               <KpiCard
                 label={t.activeDays}
                 value={String(overview?.activeDays ?? 0)}
@@ -699,6 +703,15 @@ export function App() {
                 label={t.totalEvents}
                 value={formatNumber(overview?.totalEvents ?? 0)}
                 delta={kpiDeltas.totalEvents}
+              />
+            </div>
+            <div className="card">
+              <KpiCard
+                label={t.userMessageChars}
+                value={typeof overview?.interactionMetrics?.userMessageChars === 'number'
+                  ? formatCompact(overview.interactionMetrics.userMessageChars, locale)
+                  : t.unavailable}
+                delta={kpiDeltas.userMessageChars}
               />
             </div>
             <div className="card">
@@ -747,6 +760,24 @@ export function App() {
                 />
               </ChartBoundary>
             )}
+          </div>
+
+          {/* ── Prompt Trend ── */}
+          <div className="card fade-up p-6" style={{ animationDelay: '205ms' }}>
+            <SectionHeader
+              title={t.promptTrend}
+              stat={typeof overview?.interactionMetrics?.userMessageChars === 'number'
+                ? `${formatNumber(overview.interactionMetrics.userMessageCount ?? 0)} / ${formatCompact(overview.interactionMetrics.userMessageChars, locale)}`
+                : undefined}
+            />
+            <ChartBoundary name="Prompt Trend">
+              <PromptTrendChart
+                data={overview?.interactionMetrics?.promptTrend ?? []}
+                dates={(overview?.dailyTrend ?? []).map(d => d.usageDate)}
+                locale={locale}
+                labels={{ messageCount: t.promptMessages, charCount: t.promptChars }}
+              />
+            </ChartBoundary>
           </div>
 
           {/* ── Token Trend ── */}

@@ -16,6 +16,7 @@ import { catalog as defaultCatalog } from './catalog.js';
  * OpenAI Codex 的 fast/priority 倍率另按官方 Codex speed/API priority 口径处理。
  */
 const FAST_MULTIPLIERS: Record<string, number> = {
+  'claude-fable-5-2': 2,
   'claude-opus-5-5': 2,
   'claude-opus-5': 2,
   'claude-opus-4-8': 2,
@@ -23,9 +24,11 @@ const FAST_MULTIPLIERS: Record<string, number> = {
   'grok-4.7': 2,
 };
 
-type ServiceTierSuffix = 'fast' | 'priority' | null;
+type ServiceTierSuffix = 'fast' | 'priority' | 'ultrafast' | null;
 
 const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
+  'gpt-6.1-sol': 2,
+  'gpt-6.1-terra': 2,
   'gpt-6-astra': 2,
   'gpt-6-sol': 2,
   'gpt-6-luna': 2,
@@ -37,6 +40,9 @@ const OPENAI_CODEX_TIER_MULTIPLIERS: Record<string, number> = {
 };
 
 function splitServiceTierSuffix(model: string): { baseModel: string; tier: ServiceTierSuffix } {
+  if (model === 'gpt-6.1-sol-ultrafast') {
+    return { baseModel: model.replace(/-ultrafast$/, ''), tier: 'ultrafast' };
+  }
   if (model.endsWith('-priority')) {
     return { baseModel: model.replace(/-priority$/, ''), tier: 'priority' };
   }
@@ -55,6 +61,7 @@ function getServiceTierMultiplier(
   if (!tier) return 1;
 
   if (provider === 'openai' && product === 'codex') {
+    if (tier === 'ultrafast' && resolvedModel === 'gpt-6.1-sol') return 6;
     if (tier === 'fast' && resolvedModel.startsWith('gpt-5.6-')) return 1;
     return OPENAI_CODEX_TIER_MULTIPLIERS[resolvedModel] ?? 1;
   }

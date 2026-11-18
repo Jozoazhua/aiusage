@@ -60,6 +60,7 @@ export function CostTrendChart({
                 <ChartTooltipContent
                   labelFormatter={longDate}
                   formatter={(v) => formatUsdFull(Number(v), currency)}
+                  hideZeroSortDesc
                 />
               }
             />

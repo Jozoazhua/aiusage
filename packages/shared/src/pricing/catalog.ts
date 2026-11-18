@@ -11,7 +11,7 @@ import { sourcegraph } from './data/sourcegraph.js';
 import { xai } from './data/xai.js';
 import { inflection, cursor, droid, opencode } from './data/placeholders.js';
 
-export const PRICING_VERSION = '2026-10-09-upstream-1.7.14-local-v1';
+export const PRICING_VERSION = '2026-11-18-upstream-1.8.3-local-v1';
 
 /**
  * 模型别名（精确匹配优先于前缀回退）。
